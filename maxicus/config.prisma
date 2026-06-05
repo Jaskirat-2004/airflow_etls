@@ -1,0 +1,433 @@
+model Client {
+  id                        String    @id @default(cuid())
+  resellerId                String    @map("reseller_id")
+  allocatedLicenseCount     Int       @default(0) @map("allocated_license_count")
+  totalLicenseCount         Int       @default(1) @map("total_license_count")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  archivedAt                DateTime? @map("archived_at") @db.Timestamptz(6)
+  email                     String
+  expirationDate            DateTime  @map("expiration_date") @db.Date
+  isContainerCreated        Boolean   @map("is_container_created")
+  isDbCreated               Boolean   @map("is_db_created")
+  name                      String
+  auditApiKey               String?   @map("audit_api_key")
+  updatedAt                 DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reseller                  Reseller  @relation(fields: [resellerId], references: [ssoId])
+  isWelcomeEmailSent        Boolean   @default(false) @map("is_welcome_email_sent")
+  welcomeEmailSendAttemptAt DateTime? @map("welcome_email_send_attempt") @db.Timestamptz(6)
+
+  @@unique([name, resellerId])
+  @@index([resellerId])
+  @@index([isWelcomeEmailSent])
+  @@map("client")
+}
+
+model ClientMetaData {
+  id                    Int                @id @default(autoincrement())
+  allocatedLicenseCount Int                @default(0) @map("allocated_license_count")
+  archivedAt            DateTime?          @map("archived_at") @db.Timestamptz(6)
+  email                 String?
+  expirationDate        DateTime?          @map("expiration_date") @db.Timestamptz(6)
+  name                  String?
+  iva                   Boolean            @default(false)
+  timezone              Json               @default("{\"value\": \"Etc/GMT\", \"label\": \"UTC\"}")
+  nonIva                Boolean            @default(false)
+  isSingleMachine       Boolean?           @default(false)
+  maxAuxTimeInHours     Int?
+  syncStaffData         Boolean            @default(false) @map("sync_staff_data")
+  staffSyncProvider     StaffSyncProvider? @map("staff_sync_provider")
+  staffSyncConfig       Json?              @map("staff_sync_config")
+  provider              String?
+  bucketName            String?            @map("bucket_name")
+  accessKeyId           String?            @map("access_key_id")
+  secretAccessKey       String?            @map("secret_access")
+  endpoint              String?
+  region                String?
+  supersetDashboardKey  String?            @map("superset_dashboard_key")
+  supersetUsername      String?            @map("superset_username")
+  supersetPassword      String?            @map("superset_password")
+  totalLicenseCount     Int                @default(1) @map("total_license_count")
+
+  @@map("client_meta_data")
+}
+
+model Roles {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(100)
+  shortDesc   String        @map("short_desc") @db.VarChar(100)
+  isDefault   Boolean       @default(false)
+  createdAt   DateTime?     @default(now()) @map("created_at") @db.Timestamptz(6)
+  modifiedAt  DateTime?     @updatedAt @map("modified_at") @db.Timestamptz(6)
+  permissions Permissions[]
+  user        User[]
+
+  @@map("roles")
+}
+
+model User {
+  ssoId               String               @unique @map("sso_id")
+  username            String?              @map("user_name")
+  emailId             String               @unique(map: "email_id") @map("email_id") @db.VarChar(150)
+  firstName           String               @map("first_name") @db.VarChar(150)
+  lastName            String?              @map("last_name") @db.VarChar(150)
+  mobile              String?              @default("")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  modifiedAt          DateTime?            @updatedAt @map("modified_at") @db.Timestamptz(6)
+  roleId              Int?                 @map("role_id")
+  status              Int?                 @default(1)
+  isManager           Boolean?             @default(false) @map("is_manager")
+  hasMediaAccess      Boolean?             @default(false) @map("has_media_access")
+  authSource          String?              @map("auth_source")
+  reportsToId         String?              @map("reports_to_id")
+  createdBy           String?              @default("") @map("created_by") @db.VarChar(150)
+  role                Roles?               @relation(fields: [roleId], references: [id])
+  userTagGroups       UserTagGroup[]       @relation(map: "user_tag_groups")
+  feedbacks           Feedback[]           @relation(map: "feedbacks")
+  reportsTo           User?                @relation("ReportsTo", fields: [reportsToId], references: [ssoId], map: "reports_to")
+  reportees           User[]               @relation("ReportsTo")
+  appReportees        AppUser[]            @relation("appReportees", map: "app_reportees")
+  acknowledgedAlerts  ArchivedAlert[]      @relation("AlertAcknowledgingUser")
+  AppUser             AppUser[]            @relation("updatedByAdmin")
+  favourites          UserFavourites[]
+  preferences         UserPreferences?
+  crmDeviceTokens     UserDeviceToken[]    @relation("CRMDeviceToken")
+  userLogs            UserActionLog[]
+  webhookIntegrations WebhookIntegration[]
+  generatedReports    GeneratedReports[]
+
+  // Requests assigned to this manager
+  managedAuxRequests          AuxRequest[] @relation("ManagedAuxRequests")
+  escalatedManagedAuxRequests AuxRequest[] @relation("EscalatedManagedAuxRequests")
+  resolvedByAuxRequests       AuxRequest[] @relation("resolvedAuxRequests")
+
+  @@map("user")
+}
+
+model TagGroup {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  isDefault     Boolean         @default(false)
+  values        TagGroupValue[]
+  users         UserTagGroup[] // Change the relation to UserTagGroup
+  taggings      Tagging[]
+  activities    Activity[]
+  appUsers      AppUser[]
+  configuration AppUserConfig?
+  alertRules    AlertRule[]
+  userTagValues UserTagValues[]
+  taskConfigs   TaskConfig[]
+
+  @@index([name])
+  @@map("tag_group")
+}
+
+model TagName {
+  id     Int        @id @default(autoincrement())
+  name   String     @unique
+  values TagValue[]
+
+  @@map("tag_name")
+}
+
+model TagValue {
+  id             Int             @id @default(autoincrement())
+  name           String
+  tagNameId      Int             @map("tag_name_id")
+  tagGroupValues TagGroupValue[] @relation(map: "tag_group_values")
+  tag            TagName         @relation(fields: [tagNameId], references: [id])
+  userTagValues  UserTagValues[]
+
+  @@index([tagNameId, name])
+  @@index([tagNameId])
+  @@map("tag_value")
+}
+
+model TagGroupValue {
+  id         Int      @id @default(autoincrement())
+  tagGroupId Int      @map("tag_group_id")
+  tagValueId Int      @map("tag_value_id")
+  tagGroup   TagGroup @relation(fields: [tagGroupId], references: [id], map: "tag_group")
+  tagValue   TagValue @relation(fields: [tagValueId], references: [id], map: "tag_value")
+
+  @@index([tagValueId])
+  @@index([tagGroupId])
+  @@map("tag_group_value")
+}
+
+model UserTagGroup {
+  ssoId      String   @map("user_id")
+  user       User     @relation(fields: [ssoId], references: [ssoId])
+  tagGroupId Int      @map("tag_group_id")
+  tagGroup   TagGroup @relation(fields: [tagGroupId], references: [id])
+
+  @@id([ssoId, tagGroupId])
+  @@index([ssoId])
+  @@index([tagGroupId])
+  @@map("user_tag_group")
+}
+
+model ApplicationCategoryList {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  taggings  Tagging[] @relation("TaggingApplicationCategory")
+
+  @@map("application_category_list")
+}
+
+model AppUser {
+  id                   Int             @id @default(autoincrement())
+  profilePic           String?         @map("profile_pic")
+  domain               String?
+  workstationUserId    String          @map("workstation_user_id")
+  state                ApprovalState   @default(Pending)
+  tagGroup             TagGroup?       @relation(fields: [userTagGroupId], references: [id], map: "tag_group")
+  userTagGroupId       Int?            @map("user_tag_group_id")
+  appProductivityTagId Int?            @map("app_productivity_tag_id")
+  updatedById          String?         @map("updated_by_id")
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt           DateTime?       @map("archived_at") @db.Timestamptz(6)
+  approvedAt           DateTime?       @map("approved_at") @db.Timestamptz(6)
+  activities           Activity[]      @relation("UserActivities")
+  userAppInfo          AppInfo[]       @relation("userAppInfo")
+  archivedAlerts       ArchivedAlert[] @relation("UserArchivedAlerts")
+  activeAlerts         ActiveAlert[]   @relation("ActiveAlerts")
+
+  userImages   UserImages[]     @relation("UserImages", map: "user_images")
+  userMachines AppUserMachine[] @relation("userAppMachine", map: "app_user_machine")
+
+  reportsTo    String? @map("reports_to")
+  appReportees User?   @relation("appReportees", fields: [reportsTo], references: [ssoId], map: "app_reportees")
+  updatedBy    User?   @relation("updatedByAdmin", fields: [updatedById], references: [ssoId], map: "updated_by")
+
+  lockUnlockActivities ScreenEvent[]        @relation("screenevents")
+  deviceToken          AppUserDeviceToken[] @relation("deviceToken")
+  userTagValues        UserTagValues[]
+  breakEventLogs       BreakEventLog[]
+  webhookEvents        WebhookEvent[]
+
+  acknowledgedArchivedAlerts ArchivedAlert[]     @relation("AppUserAcknowledge")
+  appUserConfig              AppUserConfig[]
+  auxApprovalRequests        AuxRequest[]
+  taskStepExecutions         TaskStepExecution[]
+  taskExecutions             TaskExecution[]
+
+  @@index([workstationUserId, domain])
+  @@index([state])
+  @@index([reportsTo, state])
+  @@index([reportsTo, state, userTagGroupId])
+  @@index([userTagGroupId])
+  @@map("app_user")
+}
+
+model Activity {
+  id                      BigInt               @default(autoincrement())
+  captureTime             DateTime             @map("capture_time") @db.Timestamptz(6)
+  tickDuration            Int                  @default(15) @map("tick_duration")
+  userId                  Int                  @map("user_id")
+  user                    AppUser              @relation("UserActivities", fields: [userId], references: [id])
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  appName                 String?              @map("app_name")
+  machineId               String               @map("machine_id")
+  webFullUrl              String?              @map("web_full_url")
+  webUrlDomain            String?              @map("web_url_domain")
+  webUrlTitle             String?              @map("web_url_title")
+  productivityStatus      ProductivityStatus?  @map("productivity_status")
+  activityStatus          ActivityStatus       @map("activity_status")
+  applicationCategory     ApplicationCategory? @map("application_category")
+  applicationCategoryName String?              @map("application_category_name")
+  workBreakType           String?              @map("work_break_type")
+  AuxType                 String?              @map("aux_type")
+  ipAddress               String               @default("") @map("ip_address")
+  tagGroup                TagGroup?            @relation(fields: [userTagGroupId], references: [id], map: "tag_group")
+  userTagGroupId          Int?                 @map("user_tag_group_id")
+
+  @@id([id, captureTime])
+  @@index([userTagGroupId])
+  @@index([userId, captureTime])
+  // NEW PERFORMANCE INDEXES FOR getAttendance query
+  @@index([userId, captureTime, activityStatus], map: "idx_activity_user_capture_status")
+  @@index([userId, captureTime, machineId], map: "idx_activity_user_capture_machine")
+  @@map("activity")
+}
+
+model Tagging {
+  id                     Int                      @id @default(autoincrement())
+  tagType                TagType                  @map("tag_type")
+  target                 String
+  status                 ProductivityStatus
+  applicationCategory    ApplicationCategory?     @map("application_category")
+  tagGroup               TagGroup                 @relation(fields: [tagGroupId], references: [id], map: "tag_group")
+  tagGroupId             Int                      @map("tag_group_id")
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  approvalRequired       Boolean?                 @default(false) @map("approval_required")
+  durationLimit          Int?                     @default(0) @map("duration")
+  auxApprovalRequest     AuxRequest[]
+  applicationCategoryId  Int?                     @map("application_category_id") // NEW FK
+  applicationCategoryRel ApplicationCategoryList? @relation("TaggingApplicationCategory", fields: [applicationCategoryId], references: [id])
+
+  @@unique([target, tagGroupId, tagType])
+  @@index([target, tagType, tagGroupId])
+  @@index([id, tagGroupId])
+  @@index([tagType])
+  @@index([applicationCategoryId])
+  @@index([status])
+  @@index([tagGroupId])
+  @@index([applicationCategory])
+  @@index([target])
+  @@map("tagging")
+}
+
+model AuxRequest {
+  id     Int              @id @default(autoincrement())
+  status AuxRequestStatus @default(PENDING) // PENDING, APPROVED, REJECTED, COMPLETED, EXPIRED
+
+  // Relations
+  aux   Tagging @relation(fields: [auxId], references: [id])
+  auxId Int     @map("aux_id")
+
+  appUser   AppUser @relation(fields: [appUserId], references: [id])
+  appUserId Int     @map("app_user_id")
+  machineId String  @map("machine_id")
+
+  // Manager assigned to review the request
+  managerId String @map("manager_id") @db.VarChar(150)
+  manager   User   @relation("ManagedAuxRequests", fields: [managerId], references: [ssoId])
+
+  // Manager assigned to review the request
+  escalatedManagerId String? @map("escalated_manager_id") @db.VarChar(150)
+  escalatedManager   User?   @relation("EscalatedManagedAuxRequests", fields: [escalatedManagerId], references: [ssoId])
+
+  // Manager who actually approved/rejected (could be same as managerId, or escalated)
+  resolvedById String? @map("resolved_by_id") @db.VarChar(150)
+  resolvedBy   User?   @relation("resolvedAuxRequests", fields: [resolvedById], references: [ssoId])
+
+  // Timing
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  approvedAt         DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejectedAt         DateTime? @map("rejected_at") @db.Timestamptz(6)
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  expiredAt          DateTime? @map("expired_at") @db.Timestamptz(6) // auto-expire if manager doesn’t act
+  escalatedAt        DateTime? @map("escalated_at") @db.Timestamptz(6)
+  completedAt        DateTime? @map("ended_at") @db.Timestamptz(6) // when agent actually ended Aux
+  overtimeNotifiedAt DateTime? @map("overtime_notified_at") @db.Timestamptz(6)
+  expectedEndTime    DateTime? @map("expected_end_time") @db.Timestamptz(6) // calculated (start + limit)
+
+  @@unique([appUserId, auxId, status, machineId, createdAt], name: "unique_active_aux_request")
+  @@index([status])
+  @@index([appUserId])
+  @@index([managerId])
+  @@map("aux_request")
+}
+
+model AppUserMachine {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  machineId      String   @map("machine_id")
+  appUser        AppUser  @relation("userAppMachine", fields: [userId], references: [id], map: "app_user")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamptz(6)
+
+  @@unique([userId, machineId])
+  @@index([userId])
+  @@map("app_user_machine")
+}
+
+model AppInfo {
+  id                    Int             @id @default(autoincrement())
+  machineId             String          @map("machine_id")
+  userId                Int             @map("user_id")
+  appUser               AppUser         @relation("userAppInfo", fields: [userId], references: [id], map: "app_user")
+  osName                String          @map("os_name") @db.VarChar(50)
+  osVersion             String          @map("os_version") @db.VarChar(50)
+  appVersion            String          @map("app_version") @db.VarChar(50)
+  workstationId         String          @map("workstation_id") @db.VarChar(50)
+  workstationType       WorkstationType @map("workstation_type")
+  updatedAt             DateTime?       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  batteryPercentage     Float           @map("battery_percentage")
+  workstationMacAddress String          @map("workstation_mac_address")
+  routerMacAddress      String          @map("router_mac_address")
+  ipAddress             String          @map("ip_address")
+
+  @@unique([userId, machineId])
+  @@index([userId, machineId])
+  @@index([userId])
+  @@map("app_info")
+}
+
+model UserImages {
+  id              BigInt   @default(autoincrement())
+  captureTime     DateTime @map("capture_time") @db.Timestamptz(6)
+  cameraImage     String?  @map("camera_image")
+  screenshotImage String?  @map("screenshot_image")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userId          Int      @map("user_id")
+  user            AppUser  @relation("UserImages", fields: [userId], references: [id])
+  machineId       String   @map("machine_id")
+  ipAddress       String   @default("") @map("ip_address")
+
+  @@id([id, captureTime])
+  @@index([userId, captureTime])
+  @@map("user_images")
+}
+
+model WhitelistIpAddresses {
+  id         Int       @id @default(autoincrement())
+  ipAddress  String    @unique @map("ip_address")
+  isActive   Boolean?  @default(true) @map("is_active")
+  type       IPTYPE?   @default(WFH)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime? @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@map("whitelist_ip_addresses")
+}
+
+model ScreenEvent {
+  id             Int             @id @default(autoincrement())
+  userId         Int             @map("user_id")
+  machineId      String          @map("machine_id")
+  lockAt         DateTime?       @map("lock_at") @db.Timestamptz(6)
+  unlockAt       DateTime?       @map("unlock_at") @db.Timestamptz(6)
+  user           AppUser         @relation("screenevents", fields: [userId], references: [id], map: "user")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  activityStatus ActivityStatus? @map("activity_status")
+  auxDetails     String?         @map("aux_details")
+
+  @@index([userId, machineId])
+  @@index([userId])
+  // NEW PERFORMANCE INDEXES FOR getAttendance query
+  @@index([userId, lockAt, unlockAt], map: "idx_screen_event_user_times")
+  @@index([userId, unlockAt, lockAt, activityStatus], map: "idx_screen_event_user_unlock_status")
+  @@map("screen_event")
+}
+
+model BreakEventLog {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  machineId String    @map("machine_id")
+  startTime DateTime  @map("start_time") @db.Timestamptz(6)
+  endTime   DateTime? @map("end_time") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      AppUser   @relation(fields: [userId], references: [id])
+  breakType String    @map("break_type")
+
+  @@index([userId, machineId])
+  @@map("break_event_log")
+}
+
+model UserTagValues {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  user       AppUser   @relation(fields: [userId], references: [id])
+  tagGroupId Int?      @map("tag_group_id")
+  tagGroup   TagGroup? @relation(fields: [tagGroupId], references: [id])
+  tagValueId Int?      @map("tag_value_id")
+  tagValue   TagValue? @relation(fields: [tagValueId], references: [id])
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([userId, tagValueId])
+  @@index([userId, tagGroupId, tagValueId])
+  @@map("user_tag_values")
+}

@@ -1,0 +1,51 @@
+=============================================================================================================================================================
+
+## Step 1 — Copy all CSVs into the container: (BASH)
+
+docker cp /home/devadmin/WFM/traya/dumps/acd_call_details.csv postgres-17:/tmp/acd_call_details.csv
+docker cp /home/devadmin/WFM/traya/dumps/agent_productivity_interval_summary.csv postgres-17:/tmp/agent_productivity_interval_summary.csv
+docker cp /home/devadmin/WFM/traya/dumps/agent_session_details.csv postgres-17:/tmp/agent_session_details.csv
+docker cp /home/devadmin/WFM/traya/dumps/call_history.csv postgres-17:/tmp/call_history.csv
+docker cp /home/devadmin/WFM/traya/dumps/calling_kpis_data.csv postgres-17:/tmp/calling_kpis_data.csv
+docker cp /home/devadmin/WFM/traya/dumps/master_tarcker.csv postgres-17:/tmp/master_tracker.csv
+
+=============================================================================================================================================================
+
+## Step 2 — Load all 5 tables: (SQL)
+
+COPY acd_call_details FROM '/tmp/acd_call_details.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+
+COPY call_history FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
+
+COPY calling_kpis_data FROM '/tmp/calling_kpis_data.csv' DELIMITER ',' CSV HEADER;
+
+COPY master_tracker FROM '/tmp/master_tracker.csv' DELIMITER ',' CSV HEADER;
+
+
+
+COPY calling_kpis_data (employee_id, coach_name, tl_name, process, location, num_attempted, num_answered, num_unanswered, total_time_spent, talk_time, calls_over_20m, miss_match_count) FROM '/tmp/calling_kpis_data.csv' DELIMITER ',' CSV HEADER;
+UPDATE calling_kpis_data SET report_date = '2026-05-28' WHERE report_date IS NULL;
+
+=============================================================================================================================================================
+
+## To check the counts
+
+SELECT 'acd_call_details' AS table_name, COUNT(*) FROM acd_call_details
+UNION ALL
+SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+UNION ALL
+SELECT 'call_history', COUNT(*) FROM call_history
+UNION ALL
+SELECT 'calling_kpis_data', COUNT(*) FROM calling_kpis_data
+UNION ALL
+SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
+UNION ALL
+SELECT 'master_tarcker', COUNT(*) FROM master_tracker;
+
+=============================================================================================================================================================
+
+
