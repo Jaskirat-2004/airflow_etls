@@ -2,27 +2,25 @@
 
 ## Step 1 — Copy all CSVs into the container: (BASH)
 
-docker cp /home/devadmin/WFM/traya/dumps/acd_call_details.csv postgres1:/tmp/acd_call_details.csv
+docker cp /home/devadmin/WFM/euler/agent_productivity_interval_summary.csv postgres1:/tmp/agent_productivity_interval_summary.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/agent_productivity_interval_summary.csv postgres1:/tmp/agent_productivity_interval_summary.csv
+docker cp /home/devadmin/WFM/euler/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
+docker cp /home/devadmin/WFM/euler/call_history.csv postgres1:/tmp/call_history.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/call_history.csv postgres1:/tmp/call_history.csv
+docker cp /home/devadmin/WFM/euler/leads_manual.csv postgres1:/tmp/leads_manual.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/calling_kpis_data.csv postgres1:/tmp/calling_kpis_data.csv
+docker cp /home/devadmin/WFM/euler/sql_manual.csv postgres1:/tmp/sql_manual.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/master_tracker.csv postgres1:/tmp/master_tracker.csv
+docker cp /home/devadmin/WFM/euler/euler_head_count.csv postgres1:/tmp/euler_head_count.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/traya_head_count.csv postgres1:/tmp/traya_head_count.csv
+docker cp /home/devadmin/WFM/euler/roster.csv postgres1:/tmp/roster.csv
 
-docker cp /home/devadmin/WFM/traya/dumps/roster.csv postgres1:/tmp/roster.csv
+
 
 =============================================================================================================================================================
 
 ## Step 2 — Load all 5 tables: (SQL)
-
-COPY acd_call_details FROM '/tmp/acd_call_details.csv' DELIMITER ',' CSV HEADER;
 
 COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
 
@@ -30,15 +28,18 @@ COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' C
 
 COPY call_history FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
 
-COPY calling_kpis_data FROM '/tmp/calling_kpis_data.csv' DELIMITER ',' CSV HEADER;
+COPY leads_manual FROM '/tmp/leads_manual.csv' DELIMITER ',' CSV HEADER;
 
-COPY master_tracker FROM '/tmp/master_tracker.csv' DELIMITER ',' CSV HEADER;
+COPY sql_manual FROM '/tmp/sql_manual.csv' DELIMITER ',' CSV HEADER;
 
-COPY traya_head_count FROM '/tmp/traya_head_count.csv' DELIMITER ',' CSV HEADER;
+COPY euler_head_count FROM '/tmp/euler_head_count.csv' DELIMITER ',' CSV HEADER;
 
 COPY roster FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
 
 
+## EXTRAS 
+
+COPY leads_manual (report_date, lead_id, lead_name, phone) FROM '/tmp/leads_manual.csv' DELIMITER ',' CSV HEADER;
 
 COPY calling_kpis_data (employee_id, coach_name, tl_name, process, location, num_attempted, num_answered, num_unanswered, total_time_spent, talk_time, calls_over_20m, miss_match_count) FROM '/tmp/calling_kpis_data.csv' DELIMITER ',' CSV HEADER;
 UPDATE calling_kpis_data SET report_date = '2026-05-28' WHERE report_date IS NULL;
@@ -47,13 +48,13 @@ UPDATE calling_kpis_data SET report_date = '2026-05-28' WHERE report_date IS NUL
 
 ## To check the counts
 
-SELECT 'acd_call_details' AS table_name, COUNT(*) FROM acd_call_details
-UNION ALL
 SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
 UNION ALL
 SELECT 'call_history', COUNT(*) FROM call_history
 UNION ALL
-SELECT 'calling_kpis_data', COUNT(*) FROM calling_kpis_data
+SELECT 'leads_manual', COUNT(*) FROM leads_manual
+UNION ALL
+SELECT 'leads_unified', COUNT(*) FROM leads_unified
 UNION ALL
 SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
 UNION ALL

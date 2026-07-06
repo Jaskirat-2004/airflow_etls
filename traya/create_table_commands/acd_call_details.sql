@@ -1,7 +1,8 @@
 -- acd_call_details: inbound/outbound call records with agent handling details
 CREATE TABLE acd_call_details (
+    report_date           DATE,  
     row_num               INTEGER,
-    campaign              VARCHAR(255),
+    campaign_name         VARCHAR(255),
     phone                 VARCHAR(50),
     display_phone         VARCHAR(50),
     unique_id             VARCHAR(100),
@@ -11,7 +12,7 @@ CREATE TABLE acd_call_details (
     dnis                  VARCHAR(50),
     call_type             VARCHAR(50),
     call_id               VARCHAR(100),
-    answered              VARCHAR(50),
+    answered_hungup       VARCHAR(50),
     call_time             TIMESTAMP,
     queue_id              INTEGER,
     queue_name            VARCHAR(255),

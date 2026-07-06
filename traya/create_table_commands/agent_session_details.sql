@@ -1,5 +1,6 @@
 -- agent_session_details: agent login/logout and ready/break state per session
 CREATE TABLE agent_session_details (
+    report_date                 DATE,  
     user_id                     VARCHAR(100),
     username                    VARCHAR(255),
     session_id                  VARCHAR(500),  -- long hash-based ID

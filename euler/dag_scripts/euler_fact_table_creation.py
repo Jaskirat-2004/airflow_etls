@@ -1,6 +1,6 @@
 """
 PROGRAMMER : JASKIRAT
-INFO : TRAYA - CREATE CLICKHOUSE FACT TABLES (idempotent, explicit DDL)
+INFO : EULER - CREATE CLICKHOUSE FACT TABLES
 """
 
 # JS ========================================= IMPORTS ========================================= JS
@@ -10,7 +10,7 @@ from airflow.decorators import dag, task
 from airflow.hooks.base import BaseHook
 from clickhouse_driver import Client
 
-from traya.config.fact_table_config import JS_FACT_TABLES_CREATE, JS_FACT_CONFIG
+from euler.config.fact_table_config import JS_FACT_TABLES, JS_FACT_CONFIG
 
 import logging
 logger = logging.getLogger(__name__)
@@ -18,23 +18,23 @@ logger = logging.getLogger(__name__)
 # JS ==================================== CONNECTOIN CONFIG ==================================== JS
 
 DESTINATION_CONN_ID = "DI-CLICKHOUSE"
-DESTINATION_DATABASE = "traya"
+DESTINATION_DATABASE = "eulermotors"
 
 # JS ==================================== DAG ==================================== JS
 
 default_args = {"owner": "JASKIRAT"}
 
 @dag(
-    dag_id="traya_create_fact_tables",
+    dag_id="euler_create_fact_tables",
     start_date=pendulum.datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["traya", "fact", "creation","ddl"],
+    tags=["euler", "fact", "creation","ddl"],
     default_args=default_args,
 )
-def traya_create_fact_tables():
+def euler_create_fact_tables():
     
-    logger.info("JS ====== DAG STARTED : [traya_fact_table_creation] ===== JS")
+    logger.info("JS ====== DAG STARTED : [euler_fact_table_creation] ===== JS")
 
     @task
     def create_table(table_name: str):
@@ -63,7 +63,7 @@ def traya_create_fact_tables():
         finally:
             client.disconnect()
 
-    for fact_name in JS_FACT_TABLES_CREATE:
+    for fact_name in JS_FACT_TABLES:
         create_table.override(task_id=f"create_{fact_name}")(fact_name)
 
-traya_create_fact_tables()
+euler_create_fact_tables()

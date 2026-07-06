@@ -1,5 +1,6 @@
 -- agent_productivity_interval_summary: per-agent metrics in 30-min intervals
 CREATE TABLE agent_productivity_interval_summary (
+    report_date                                 DATE,  
     interval_start                              TIMESTAMP,
     interval_end                                TIMESTAMP,
     process_name                                VARCHAR(255),

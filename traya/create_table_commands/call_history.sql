@@ -1,5 +1,6 @@
 -- call_history: complete call log with IVR, queue, agent disposition and transfer details
 CREATE TABLE call_history (
+    report_date             DATE,  
     setup_id                VARCHAR(100),
     setup_name              VARCHAR(255),
     call_id                 VARCHAR(100),

@@ -1,0 +1,645 @@
+
+# JS ============================================================ JS
+#           MAIN FACT TABLE CONFIG -> at EOF
+# JS ============================================================ JS
+
+# TABLE NAMES
+
+JS_FACT_TABLES= [
+    "traya_fact_crm_report",
+    "traya_fact_apr_report",
+    "traya_fact_aux_report",
+]
+
+# JS =============================================================================================================== JS
+#                                       QUERIES FOR EACH TABLE 
+# JS =============================================================================================================== JS
+
+# JS ======================================= CRM REPORT FACT TABLE ======================================= JS
+
+TRAYA_FACT_CRM_REPORT_DDL = """
+
+CREATE TABLE IF NOT EXISTS traya.traya_fact_crm_report
+(
+    report_date                 Date,
+    week                        String,
+    employee_id                 String,
+    coach_name                  String,
+    tl_name                     String,
+    process                     String,
+    location                    String,
+    num_attempted               Int32,
+    num_answered                Int32,
+    num_unanswered              Int32,
+    total_time_spent            Int32,
+    talk_time                   Int32,
+    calls_over_20m              Int32,
+    miss_match_count            Int32,
+    group_name                  String,
+    sub_group                   String,
+    operations_manager          String,
+    line_of_business            String,
+    gender                      String,
+    designation                 String,
+    batch_number                String,
+    versant_score               String,
+    education_level             String,
+    active_status               String,
+    tenure                      String,
+    date_of_joining             String
+    
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMM(report_date)
+ORDER BY (report_date, employee_id)
+
+"""
+
+TRAYA_FACT_CRM_REPORT_QUERY = """
+
+SELECT
+    c.report_date,
+
+    -- CASE 
+    --     WHEN EXTRACT(DAY FROM c.report_date) BETWEEN 1 AND 7 THEN 'Week 1'
+    --     WHEN EXTRACT(DAY FROM c.report_date) BETWEEN 8 AND 14 THEN 'Week 2'
+    --     WHEN EXTRACT(DAY FROM c.report_date) BETWEEN 15 AND 21 THEN 'Week 3'
+    --     WHEN EXTRACT(DAY FROM c.report_date) BETWEEN 22 AND 28 THEN 'Week 4'
+    --     WHEN EXTRACT(DAY FROM c.report_date) >= 29 THEN 'Week 5'
+    -- END as week,
+
+    'Week-' || (
+    FLOOR(
+        (EXTRACT(DAY FROM c.report_date) + 
+        EXTRACT(ISODOW FROM date_trunc('month', c.report_date)) - 2) / 7
+        ) + 1 )::int::text  AS week,
+
+    c.employee_id,
+    COALESCE(c.coach_name, '')           AS coach_name,
+    COALESCE(c.tl_name, '')              AS tl_name,
+    COALESCE(c.process, '')              AS process,
+    COALESCE(c.location, '')             AS location,
+    COALESCE(c.num_attempted, 0)         AS num_attempted,
+    COALESCE(c.num_answered, 0)          AS num_answered,
+    COALESCE(c.num_unanswered, 0)        AS num_unanswered,
+    COALESCE(c.total_time_spent, 0)      AS total_time_spent,
+    COALESCE(c.talk_time, 0)             AS talk_time,
+    COALESCE(c.calls_over_20m, 0)        AS calls_over_20m,
+    COALESCE(c.miss_match_count, 0)      AS miss_match_count,
+    
+    COALESCE(m.group_name, 'UNKNOWN')         AS group_name,
+    COALESCE(m.sub_group, 'UNKNOWN')          AS sub_group,
+    COALESCE(m.operations_manager, 'UNKNOWN') AS operations_manager,   -- AM level (above TL)
+    COALESCE(m.line_of_business, 'UNKNOWN')   AS line_of_business,
+    COALESCE(m.gender, 'UNKNOWN')             AS gender,
+    COALESCE(m.designation, 'UNKNOWN')        AS designation,
+    COALESCE(m.batch_number, 'UNKNOWN')       AS batch_number,
+    COALESCE(m.versant_score, 'UNKNOWN')      AS versant_score,
+    COALESCE(m.education_level, 'UNKNOWN')    AS education_level,
+    COALESCE(m.active_status, 'UNKNOWN')      AS active_status,
+    COALESCE(m.tenure, 'UNKNOWN')             AS tenure,
+    m.date_of_joining                         AS date_of_joining       -- for tenure buckets
+
+FROM calling_kpis_data as c
+LEFT JOIN master_tracker as m
+    ON c.report_date = m.report_date 
+    AND c.employee_id = m.emp_id
+WHERE c.report_date > '{last_processed}'
+    AND c.report_date <= '{high_water_mark}'
+
+"""
+
+# JS ======================================= APR REPORT FACT TABLE ======================================= JS
+
+TRAYA_FACT_APR_REPORT_DDL = """
+
+CREATE TABLE IF NOT EXISTS traya.traya_fact_apr_report
+(
+    report_date                 Date,
+    agent_email                 String,
+    campaign_name               String,
+    week                        String,
+    
+    -- dimension (from master_tracker LEFT JOIN → Nullable)
+    mt_emp_id                   Nullable(String),
+    mt_emp_name                 Nullable(String),
+    mt_designation              Nullable(String),
+    mt_status                   Nullable(String),
+    mt_team_leader              Nullable(String),
+    mt_operations_manager       Nullable(String),
+    mt_group_name               Nullable(String),
+    mt_sub_group                Nullable(String),
+    mt_line_of_business         Nullable(String),
+    mt_tenure                   Nullable(String),
+    mt_doj                      Nullable(String),
+    mt_batch                    Nullable(String),
+    mt_versant                  Nullable(String),
+    mt_active_status            Nullable(String),
+    mt_gender                   Nullable(String),
+    mt_education                Nullable(String),
+    mt_fresher_exp              Nullable(String),
+
+    -- APR raw
+    ap_intervals                Nullable(Int32),
+    ap_staffed_secs             Nullable(Int64),
+    ap_ready_secs               Nullable(Int64),
+    ap_break_secs               Nullable(Int64),
+    ap_idle_secs                Nullable(Int64),
+    ap_service_secs             Nullable(Int64),
+    ap_talk_secs                Nullable(Int64),
+    ap_acw_secs                 Nullable(Int64),
+    ap_hold_secs                Nullable(Int64),
+    ap_ring_secs                Nullable(Int64),
+    ap_wrapped_calls            Nullable(Int32),
+    ap_auto_dials               Nullable(Int32),
+    ap_auto_preview_dials       Nullable(Int32),
+    ap_inbound_received         Nullable(Int32),
+    ap_manual_dials             Nullable(Int32),
+    ap_manual_preview_dials     Nullable(Int32),
+    ap_callbacks_received       Nullable(Int32),
+    ap_transfers_received       Nullable(Int32),
+    ap_connected_auto           Nullable(Int32),
+    ap_connected_inbound        Nullable(Int32),
+    ap_connected_manual         Nullable(Int32),
+    ap_connected_callbacks      Nullable(Int32),
+    ap_connected_manual_preview Nullable(Int32),
+    ap_connected_auto_preview   Nullable(Int32),
+    ap_click_to_calls           Nullable(Int32),
+    ap_connected_click_to_calls Nullable(Int32),
+    ap_connected_transfers      Nullable(Int32),
+
+    -- derived
+    ap_total_offered            Nullable(Int64),
+    ap_total_answered           Nullable(Int64),
+
+    -- call_history pivots
+    ch_calls                    Int32,
+    ch_inbound_calls            Int32,
+    ch_outbound_calls           Int32,
+    ch_connected                Int32,
+    ch_not_connected            Int32,
+    ch_tagged                   Int32,
+    ch_sales                    Int32,
+    ch_voicemail                Int32,
+    ch_answered_hold_calls      Int32,
+    ch_short_calls              Int32,
+    ch_talk_secs                Int64,
+    ch_cust_talk_secs           Int64,
+    ch_acw_secs                 Int64,
+    ch_hold_secs                Int64,
+    ch_ivr_secs                 Int64,
+
+    -- THT
+    ap_tht                      Nullable(Int64),
+
+    -- login_count (fractional → Float64, Nullable when ap missing)
+    login_count                 Nullable(Float64),
+
+    -- session
+    ses_sessions                Int32,
+    ses_ready_secs              Int64,
+    ses_break_secs              Int64,
+
+    -- agent-day login/logout (Nullable)
+    day_first_login             Nullable(DateTime),
+    day_last_logout             Nullable(DateTime)
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMM(report_date)
+ORDER BY (report_date, agent_email, campaign_name)
+
+"""
+
+TRAYA_FACT_APR_REPORT_QUERY = """
+
+-- agent_productivity_interval_summary 
+WITH ap AS (
+    SELECT
+        report_date AS report_date,
+        lower(trim(user_id)) AS agent_email,
+        campaign_name AS campaign_name,
+        
+        COUNT(*) AS ap_intervals,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_staffed_duration),'')::interval),0))::bigint          AS ap_staffed_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_ready_duration),'')::interval),0))::bigint            AS ap_ready_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_break_duration),'')::interval),0))::bigint            AS ap_break_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_idle_time),'')::interval),0))::bigint                 AS ap_idle_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_service_time),'')::interval),0))::bigint              AS ap_service_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_talk_time_in_interval),'')::interval),0))::bigint     AS ap_talk_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_acw_duration_in_interval),'')::interval),0))::bigint  AS ap_acw_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_customer_hold_duration),'')::interval),0))::bigint    AS ap_hold_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(total_ring_time),'')::interval),0))::bigint                 AS ap_ring_secs,
+        
+        -- OFFERED components (6)
+        SUM(auto_dials)                       AS ap_auto_dials,
+        SUM(auto_preview_dials)               AS ap_auto_preview_dials,
+        SUM(inbound_received)                 AS ap_inbound_received,
+        SUM(manual_dials)                     AS ap_manual_dials,
+        SUM(manual_preview_dials)             AS ap_manual_preview_dials,
+        SUM(callbacks_received)               AS ap_callbacks_received,
+        
+        SUM(transfers_received)               AS ap_transfers_received,   -- (not in offered/answered, kept)
+        SUM(total_wrapped_calls)              AS ap_wrapped_calls,
+        
+        -- ANSWERED components (7)
+        SUM(connected_auto_dials)             AS ap_connected_auto,
+        SUM(connected_inbound)                AS ap_connected_inbound,
+        SUM(connected_manual_dials)           AS ap_connected_manual,
+        SUM(connected_callbacks)              AS ap_connected_callbacks,
+        SUM(connected_manual_preview_dials)   AS ap_connected_manual_preview,
+        SUM(connected_auto_preview_dials)     AS ap_connected_auto_preview,
+        SUM(click_to_calls)                   AS ap_click_to_calls,
+        SUM(connected_click_to_calls)         AS ap_connected_click_to_calls,
+        SUM(connected_transfers)              AS ap_connected_transfers
+
+    FROM agent_productivity_interval_summary
+    WHERE lower(user_id) LIKE '%maxicus%'
+    GROUP BY 1,2,3),
+
+-- call_history 
+ch AS (
+    SELECT 
+        call_time::date AS report_date, -- selecting date from call_time
+        lower(trim(user_id)) AS agent_email,
+        campaign_name AS campaign_name,
+
+        -- NEW METRICS
+        COUNT(*)                                                                    AS ch_calls,
+        COUNT(*) FILTER (WHERE call_type LIKE 'inbound%')                           AS ch_inbound_calls,
+        COUNT(*) FILTER (WHERE call_type LIKE 'outbound%')                          AS ch_outbound_calls,
+        COUNT(*) FILTER (WHERE system_disposition='CONNECTED')                      AS ch_connected,
+        COUNT(*) FILTER (WHERE system_disposition<>'CONNECTED')                     AS ch_not_connected,
+
+        COUNT(*) FILTER (
+            WHERE disposition_code NOT IN ('wrap.timeout','user.forced.logged.off')
+            AND disposition_code IS NOT NULL)                                       AS ch_tagged,        -- Tagging
+
+        COUNT(*) FILTER (WHERE disposition_class='Sale' OR disposition_code='Sale') AS ch_sales,
+        COUNT(*) FILTER (WHERE disposition_class='Voicemail')                       AS ch_voicemail,
+        
+        -- Call Answered Hold
+        COUNT(*) FILTER (
+            WHERE NULLIF(trim(customer_hold_duration),'')::interval > interval '0') AS ch_answered_hold_calls,
+        
+        -- Short Calls
+        COUNT(*) FILTER (
+            WHERE system_disposition='CONNECTED'
+            AND NULLIF(trim(user_talk_time),'')::interval < interval '60 sec')      AS ch_short_calls,
+
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(user_talk_time),'')::interval),0))::bigint          AS ch_talk_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(customer_talk_time),'')::interval),0))::bigint      AS ch_cust_talk_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(acw_duration),'')::interval),0))::bigint            AS ch_acw_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(customer_hold_duration),'')::interval),0))::bigint  AS ch_hold_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(ivr_time),'')::interval),0))::bigint                AS ch_ivr_secs
+
+    FROM call_history
+    WHERE lower(user_id) LIKE '%maxicus%'
+    GROUP BY 1,2,3),
+
+-- agent_session_details
+ses AS (
+    SELECT
+        report_date AS report_date,
+        lower(trim(user_id)) AS agent_email,
+        campaign_name AS campaign_name,
+
+        COUNT(DISTINCT session_id)                                                             AS ses_sessions,
+        MIN(login_time)                                                                        AS ses_min_login,
+        MAX(logout_time)                                                                       AS ses_max_logout,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(ready_duration),'')::interval),0))::bigint AS ses_ready_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(break_duration),'')::interval),0))::bigint AS ses_break_secs
+        
+    FROM agent_session_details
+    WHERE lower(user_id) LIKE '%maxicus%'
+    GROUP BY 1,2,3),
+
+-- master_tracker
+mt AS ( 
+    SELECT DISTINCT ON (report_date, lower(trim(official_email)))
+        report_date AS report_date, 
+        lower(trim(official_email)) AS agent_email,
+
+        emp_id              AS mt_emp_id,
+        emp_name            AS mt_emp_name, 
+        designation         AS mt_designation,
+        team_leader         AS mt_team_leader, 
+        operations_manager  AS mt_operations_manager,
+        group_name          AS mt_group_name, 
+        sub_group           AS mt_sub_group, 
+        line_of_business    AS mt_line_of_business,
+        tenure              AS mt_tenure, 
+        date_of_joining     AS mt_doj, 
+        batch_number        AS mt_batch,
+        versant_score       AS mt_versant, 
+        active_status       AS mt_active_status, 
+        gender              AS mt_gender,
+        education_level     AS mt_education, 
+        fresher_experience  AS mt_fresher_exp,
+        
+        -- Live status
+        CASE
+            WHEN group_name='Training' THEN 'Training'
+            WHEN group_name='OJT'      THEN 'OJT'
+            ELSE 'Live'
+        END                 AS mt_status
+
+    FROM master_tracker
+    WHERE official_email IS NOT NULL AND official_email <> '' AND active_status = 'Active'
+    ORDER BY report_date, lower(trim(official_email)), emp_id),
+
+-- keys for the backbone of the fact table 
+keys AS (
+    SELECT report_date, agent_email, campaign_name FROM ap
+    UNION
+    SELECT report_date, agent_email, campaign_name FROM ch
+    UNION
+    SELECT report_date, agent_email, campaign_name FROM ses )
+
+SELECT
+    k.report_date, 
+    k.agent_email, 
+    k.campaign_name,
+
+    'Week-' || (
+    FLOOR(
+        (EXTRACT(DAY FROM k.report_date) + 
+        EXTRACT(ISODOW FROM date_trunc('month', k.report_date)) - 2) / 7
+        ) + 1 )::int::text  AS week,
+
+    -- dimension (per-day)
+    mt.mt_emp_id, 
+    mt.mt_emp_name, 
+    mt.mt_designation, 
+    mt.mt_status, 
+    mt.mt_team_leader, 
+    mt.mt_operations_manager,
+    mt.mt_group_name, 
+    mt.mt_sub_group, 
+    mt.mt_line_of_business, 
+    mt.mt_tenure, 
+    mt.mt_doj, 
+    mt.mt_batch,
+    mt.mt_versant, 
+    mt.mt_active_status, 
+    mt.mt_gender, 
+    mt.mt_education, 
+    mt.mt_fresher_exp,
+
+    -- APR raw (productivity)
+    ap.ap_intervals, 
+    ap.ap_staffed_secs, 
+    ap.ap_ready_secs, 
+    ap.ap_break_secs, 
+    ap.ap_idle_secs, 
+    ap.ap_service_secs,
+    ap.ap_talk_secs, 
+    ap.ap_acw_secs, 
+    ap.ap_hold_secs, 
+    ap.ap_ring_secs, 
+    ap.ap_wrapped_calls,
+    ap.ap_auto_dials, 
+    ap.ap_auto_preview_dials, 
+    ap.ap_inbound_received, 
+    ap.ap_manual_dials, 
+    ap.ap_manual_preview_dials,
+    ap.ap_callbacks_received, 
+    ap.ap_transfers_received,
+    ap.ap_connected_auto, 
+    ap.ap_connected_inbound, 
+    ap.ap_connected_manual, 
+    ap.ap_connected_callbacks,
+    ap.ap_connected_manual_preview, 
+    ap.ap_connected_auto_preview, 
+    ap.ap_click_to_calls, 
+    ap.ap_connected_click_to_calls,
+    ap.ap_connected_transfers,
+
+    -- Calls Offered
+    (ap.ap_auto_dials + ap.ap_auto_preview_dials + ap.ap_inbound_received + 
+    ap.ap_manual_dials + ap.ap_manual_preview_dials + ap.ap_callbacks_received)              AS ap_total_offered,
+    
+    -- Calls Answered
+    (ap.ap_connected_auto + ap.ap_connected_inbound + ap.ap_connected_manual + 
+    ap.ap_connected_manual_preview + ap.ap_connected_auto_preview + ap.ap_click_to_calls)    AS ap_total_answered,
+
+    -- call_history pivots
+    COALESCE(ch.ch_calls,0) ch_calls, 
+    COALESCE(ch.ch_inbound_calls,0) ch_inbound_calls, 
+    COALESCE(ch.ch_outbound_calls,0) ch_outbound_calls,
+    COALESCE(ch.ch_connected,0) ch_connected, 
+    COALESCE(ch.ch_not_connected,0) ch_not_connected,
+    COALESCE(ch.ch_tagged,0) ch_tagged, 
+    COALESCE(ch.ch_sales,0) ch_sales, 
+    COALESCE(ch.ch_voicemail,0) ch_voicemail,
+    COALESCE(ch.ch_answered_hold_calls,0) ch_answered_hold_calls,
+    COALESCE(ch.ch_short_calls,0) ch_short_calls, 
+    COALESCE(ch.ch_talk_secs,0) ch_talk_secs, 
+    COALESCE(ch.ch_cust_talk_secs,0) ch_cust_talk_secs,
+    COALESCE(ch.ch_acw_secs,0) ch_acw_secs, 
+    COALESCE(ch.ch_hold_secs,0) ch_hold_secs,
+    COALESCE(ch.ch_ivr_secs,0) ch_ivr_secs,
+
+    -- THT
+    CASE 
+        WHEN k.campaign_name = 'MaxicusAmritsar_Outbound_Probeg' 
+        THEN ap.ap_talk_secs + ap.ap_acw_secs + ap.ap_ring_secs + ap.ap_hold_secs
+        ELSE ap.ap_talk_secs + ap.ap_acw_secs + ap.ap_hold_secs
+    END AS ap_tht,
+
+    -- LOGIN COUNT
+    CASE
+        WHEN COUNT(k.agent_email) OVER (PARTITION BY k.report_date, k.agent_email) > 1
+        THEN ap.ap_ready_secs::numeric / 28800
+        ELSE 1
+    END AS login_count,
+
+    -- session 
+    COALESCE(ses.ses_sessions,0) ses_sessions, 
+    COALESCE(ses.ses_ready_secs,0) ses_ready_secs, 
+    COALESCE(ses.ses_break_secs,0) ses_break_secs,
+
+    -- agent-DAY login/logout windowed to day
+    MIN(ses.ses_min_login)  OVER (PARTITION BY k.report_date, k.agent_email) AS day_first_login,
+    MAX(ses.ses_max_logout) OVER (PARTITION BY k.report_date, k.agent_email) AS day_last_logout
+
+FROM keys k
+LEFT JOIN ap
+    ON ap.report_date = k.report_date AND ap.agent_email = k.agent_email AND ap.campaign_name = k.campaign_name
+LEFT JOIN ch  
+    ON ch.report_date = k.report_date AND ch.agent_email = k.agent_email AND ch.campaign_name = k.campaign_name
+LEFT JOIN ses 
+    ON ses.report_date = k.report_date AND ses.agent_email = k.agent_email AND ses.campaign_name = k.campaign_name
+LEFT JOIN mt
+    ON mt.report_date = k.report_date AND mt.agent_email = k.agent_email
+
+WHERE k.report_date > '{last_processed}'
+    AND k.report_date <= '{high_water_mark}'
+
+"""
+
+# JS ======================================= AUX REPORT FACT TABLE ======================================= JS
+
+TRAYA_FACT_AUX_REPORT_DDL = """
+
+CREATE TABLE IF NOT EXISTS traya.traya_fact_aux_report (
+    report_date             Date, 
+    agent_email             String, 
+    break_reason            String,
+    mt_emp_id               Nullable(String), 
+    mt_emp_name             Nullable(String), 
+    mt_designation          Nullable(String),
+    mt_status               Nullable(String), 
+    mt_team_leader          Nullable(String), 
+    mt_operations_manager   Nullable(String),
+    mt_group_name           Nullable(String), 
+    mt_sub_group            Nullable(String), 
+    mt_line_of_business     Nullable(String),
+    mt_tenure               Nullable(String), 
+    mt_doj                  Nullable(String), 
+    mt_batch                Nullable(String),
+    mt_versant              Nullable(String), 
+    mt_active_status        Nullable(String), 
+    mt_gender               Nullable(String),
+    mt_education            Nullable(String), 
+    mt_fresher_exp          Nullable(String),
+    segments                Int32, 
+    sessions                Int32, 
+    break_secs              Int64, 
+    ready_secs              Int64
+) 
+ENGINE = MergeTree() 
+PARTITION BY toYYYYMM(report_date) 
+ORDER BY (report_date, agent_email, break_reason)
+
+"""
+
+TRAYA_FACT_AUX_REPORT_QUERY = """
+
+WITH ses AS (
+    SELECT
+        report_date,
+        lower(trim(user_id)) AS agent_email,
+
+        CASE
+            WHEN trim(COALESCE(break_reason,'')) = ''                              THEN 'Not Specified'
+            WHEN trim(break_reason) = 'erroneous.channel.system.initiated.break'   THEN 'System Break'
+            ELSE trim(break_reason)
+        END AS break_reason,
+
+        COUNT(*)                                                                          AS segments,
+        COUNT(DISTINCT session_id)                                                        AS sessions,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(break_duration),'')::interval),0))::bigint AS break_secs,
+        SUM(COALESCE(EXTRACT(EPOCH FROM NULLIF(trim(ready_duration),'')::interval),0))::bigint AS ready_secs
+    
+    FROM agent_session_details
+    WHERE lower(user_id) LIKE '%maxicus%'
+    AND report_date > '{last_processed}' AND report_date <= '{high_water_mark}'
+    GROUP BY 1,2,3
+    ),
+
+mt AS (
+    SELECT DISTINCT ON (report_date, lower(trim(official_email)))
+        report_date                        AS report_date,
+        lower(trim(official_email)) AS agent_email,
+        emp_id                      AS mt_emp_id, 
+        emp_name                    AS mt_emp_name, 
+        designation                 AS mt_designation,
+        team_leader                 AS mt_team_leader, 
+        operations_manager          AS mt_operations_manager,
+        group_name                  AS mt_group_name, 
+        sub_group                   AS mt_sub_group, 
+        line_of_business            AS mt_line_of_business,
+        tenure                      AS mt_tenure,
+        date_of_joining             AS mt_doj, 
+        batch_number                AS mt_batch,
+        versant_score               AS mt_versant, 
+        active_status               AS mt_active_status, 
+        gender                      AS mt_gender,
+        education_level             AS mt_education, 
+        fresher_experience          AS mt_fresher_exp,
+
+        CASE
+            WHEN group_name='Training' THEN 'Training' 
+            WHEN group_name='OJT' THEN 'OJT' 
+            ELSE 'Live' 
+        END                         AS mt_status
+
+    FROM master_tracker
+    WHERE official_email IS NOT NULL AND official_email <> ''
+    ORDER BY report_date, lower(trim(official_email)), emp_id
+)
+
+SELECT
+    s.report_date, 
+    s.agent_email, 
+    s.break_reason,
+    mt.mt_emp_id, 
+    mt.mt_emp_name, 
+    mt.mt_designation, 
+    mt.mt_status, 
+    mt.mt_team_leader, 
+    mt.mt_operations_manager,
+    mt.mt_group_name, 
+    mt.mt_sub_group, 
+    mt.mt_line_of_business, 
+    mt.mt_tenure, 
+    mt.mt_doj, 
+    mt.mt_batch,
+    mt.mt_versant, 
+    mt.mt_active_status, 
+    mt.mt_gender, 
+    mt.mt_education, 
+    mt.mt_fresher_exp,
+    s.segments, 
+    s.sessions, 
+    s.break_secs, 
+    s.ready_secs
+
+FROM ses s
+    LEFT JOIN mt 
+    ON mt.report_date = s.report_date AND mt.agent_email = s.agent_email;
+
+"""
+
+# JS ======================================= NEW REPORT FACT TABLE ======================================= JS
+
+
+# JS ============================================================= JS
+#                       THIS IS THE MAIN CONFIG
+# JS ============================================================= JS
+
+JS_FACT_CONFIG = {
+
+    "traya_fact_crm_report" : {
+        "query" : TRAYA_FACT_CRM_REPORT_QUERY,
+        "ddl" : TRAYA_FACT_CRM_REPORT_DDL,
+        "destination_table" : "traya_fact_crm_report",
+        "source_tables" : [
+            {"table_name" : "calling_kpis_data" , "date_column" : "report_date"},
+            {"table_name" : "master_tracker" , "date_column" : "report_date"},
+        ],
+    },
+
+    "traya_fact_apr_report" : {
+        "query" : TRAYA_FACT_APR_REPORT_QUERY,
+        "ddl" : TRAYA_FACT_APR_REPORT_DDL,
+        "destination_table" : "traya_fact_apr_report",
+        "source_tables" : [
+            {"table_name" : "agent_productivity_interval_summary" , "date_column" : "report_date"},
+            {"table_name" : "call_history" , "date_column" : "report_date"},
+            {"table_name" : "agent_session_details" , "date_column" : "report_date"},
+            {"table_name" : "master_tracker" , "date_column" : "report_date"},
+        ],
+    },
+
+    "traya_fact_aux_report" : {
+        "query" : TRAYA_FACT_AUX_REPORT_QUERY,
+        "ddl" : TRAYA_FACT_AUX_REPORT_DDL,
+        "destination_table" : "traya_fact_aux_report",
+        "source_tables" : [
+            {"table_name" : "agent_session_details" , "date_column" : "report_date"},
+            {"table_name" : "master_tracker" , "date_column" : "report_date"},
+        ],
+    },
+  
+}

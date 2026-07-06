@@ -1,3 +1,56 @@
+# JS =============================================================================================================== JS
+#                                       QUERIES FOR CRM REPORT FACT TABLE
+# JS =============================================================================================================== JS
+
+
+# JS =======================================  DDL  ======================================= JS
+
+
+TRAYA_FACT_CRM_REPORT_DDL = """
+
+CREATE TABLE IF NOT EXISTS traya.traya_fact_crm_report
+(
+    report_date                 Date,
+    week                        String,
+    tenant_name                 String,
+    entity_name                 String,
+
+    employee_id                 String,
+    coach_name                  String,
+    process                     String,
+    location                    String,
+    num_attempted               Int32,
+    num_answered                Int32,
+    num_unanswered              Int32,
+    total_time_spent            Int32,
+    talk_time                   Int32,
+    calls_over_20m              Int32,
+    miss_match_count            Int32,
+    tl_name                     String,
+    group_name                  String,
+    sub_group                   String,
+    operations_manager          String,
+    line_of_business            String,
+    gender                      String,
+    designation                 String,
+    batch_number                String,
+    versant_score               String,
+    education_level             String,
+    active_status               String,
+    tenure                      String,
+    date_of_joining             String
+    
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMM(report_date)
+ORDER BY (report_date, employee_id)
+
+"""
+
+# JS ======================================= FACT TABLE ======================================= JS
+
+
+TRAYA_FACT_CRM_REPORT_QUERY = """
 
 SELECT
     c.report_date,
@@ -51,3 +104,5 @@ LEFT JOIN master_tracker as m
     AND c.employee_id = m.emp_id
 WHERE c.report_date > '{last_processed}'
     AND c.report_date <= '{high_water_mark}'
+
+"""

@@ -1,4 +1,4 @@
-CREATE TABLE traya_tracking_table (
+CREATE TABLE euler_tracking_table (
     table_name          VARCHAR(100) PRIMARY KEY,
     last_processed_date DATE,
     rows_inserted       INTEGER,

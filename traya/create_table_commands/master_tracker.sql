@@ -1,7 +1,7 @@
 -- dim_employee: slowly changing employee dimension, one row per employee per date
 -- join to calling_kpis_data on employee_id + report_date
 CREATE TABLE master_tracker (
-    date                    DATE,
+    report_date                    DATE,
     emp_id                  VARCHAR(50),         -- VARCHAR not INT, some IDs like 'NAPS310623' exist
     emp_name                VARCHAR(255),
     official_email          VARCHAR(255),
