@@ -2,8 +2,11 @@
 #                                       QUERIES FOR LEADS REPORT FACT TABLE
 # JS =============================================================================================================== JS
 
+
 # JS ======================================= DDL ======================================= JS
+
 EULER_FACT_LEADS_REPORT_DDL = """
+
 CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_leads_report
 (
   report_date          Date,
@@ -25,10 +28,13 @@ CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_leads_report
 ENGINE = MergeTree()
 PARTITION BY toYYYYMM(report_date)
 ORDER BY (report_date, source, location)
+
 """
 
 # JS ======================================= FACT TABLE ======================================= JS
+
 EULER_FACT_LEADS_REPORT_QUERY = """
+
 -- call_history aggregated to (date, phone) — one row per dialed number per day
 WITH ch_agg AS (
   SELECT
@@ -76,4 +82,5 @@ LEFT JOIN ch_agg ch ON ch.report_date = lu.report_date AND ch.phone = lu.phone
 WHERE lu.report_date > '{last_processed}'
   AND lu.report_date <= '{high_water_mark}'
 GROUP BY lu.report_date, lu.source, COALESCE(ch.location, '(not dialed)')
+
 """

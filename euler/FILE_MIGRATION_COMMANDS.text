@@ -6,6 +6,8 @@ docker cp /home/devadmin/WFM/euler/agent_productivity_interval_summary.csv postg
 
 docker cp /home/devadmin/WFM/euler/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
 
+docker cp /home/devadmin/WFM/euler/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
+
 docker cp /home/devadmin/WFM/euler/call_history.csv postgres1:/tmp/call_history.csv
 
 docker cp /home/devadmin/WFM/euler/leads_manual.csv postgres1:/tmp/leads_manual.csv
@@ -16,6 +18,7 @@ docker cp /home/devadmin/WFM/euler/euler_head_count.csv postgres1:/tmp/euler_hea
 
 docker cp /home/devadmin/WFM/euler/roster.csv postgres1:/tmp/roster.csv
 
+docker cp /home/devadmin/WFM/euler/agent_mapper.csv postgres1:/tmp/agent_mapper.csv
 
 
 =============================================================================================================================================================
@@ -23,6 +26,8 @@ docker cp /home/devadmin/WFM/euler/roster.csv postgres1:/tmp/roster.csv
 ## Step 2 — Load all 5 tables: (SQL)
 
 COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
 
 COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
 
@@ -36,6 +41,10 @@ COPY euler_head_count FROM '/tmp/euler_head_count.csv' DELIMITER ',' CSV HEADER;
 
 COPY roster FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
 
+COPY agent_mapper FROM '/tmp/agent_mapper.csv' DELIMITER ',' CSV HEADER;
+
+
+=============================================================================================================================================================
 
 ## EXTRAS 
 
@@ -48,7 +57,7 @@ UPDATE calling_kpis_data SET report_date = '2026-05-28' WHERE report_date IS NUL
 
 ## To check the counts
 
-SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+SELECT 'roster', COUNT(*) FROM roster
 UNION ALL
 SELECT 'call_history', COUNT(*) FROM call_history
 UNION ALL
@@ -58,13 +67,14 @@ SELECT 'leads_unified', COUNT(*) FROM leads_unified
 UNION ALL
 SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
 UNION ALL
-SELECT 'master_tarcker', COUNT(*) FROM master_tracker;
+SELECT 'downtime_login_hr', COUNT(*) FROM downtime_login_hr
+UNION ALL
+SELECT 'euler_head_count', COUNT(*) FROM euler_head_count
+UNION ALL
+SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+UNION ALL
+SELECT 'sql_manual', COUNT(*) FROM sql_manual
+UNION ALL
+SELECT 'agent_mapper', COUNT(*) FROM agent_mapper;
 
 =============================================================================================================================================================
-
-select count(*) from 
-(
-    select report_date,user_id,campaign_name from agent_session_details
-    group by report_date,user_id,campaign_name
-)
-;

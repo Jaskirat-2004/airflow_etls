@@ -10,7 +10,7 @@ from airflow.decorators import dag, task
 from airflow.hooks.base import BaseHook
 from clickhouse_driver import Client
 
-from euler.config.fact_table_config import JS_FACT_TABLES, JS_FACT_CONFIG
+from euler.config.fact_table_config import JS_FACT_TABLES_CREATE, JS_FACT_CONFIG
 
 import logging
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def euler_create_fact_tables():
         finally:
             client.disconnect()
 
-    for fact_name in JS_FACT_TABLES:
+    for fact_name in JS_FACT_TABLES_CREATE:
         create_table.override(task_id=f"create_{fact_name}")(fact_name)
 
 euler_create_fact_tables()
