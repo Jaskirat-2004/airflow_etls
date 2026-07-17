@@ -1,0 +1,66 @@
+=============================================================================================================================================================
+
+## Step 1 — Copy all CSVs into the container: (BASH)
+
+docker cp /home/devadmin/WFM/vodafone/pc_collated_dump.csv postgres1:/tmp/pc_collated_dump.csv
+
+docker cp /home/devadmin/WFM/vodafone/lead_master.csv postgres1:/tmp/lead_master.csv
+
+docker cp /home/devadmin/WFM/vodafone/call_history.csv postgres1:/tmp/call_history.csv
+
+docker cp /home/devadmin/WFM/vodafone/custom_agent_productivity_interval_summary.csv postgres1:/tmp/custom_agent_productivity_interval_summary.csv
+
+docker cp /home/devadmin/WFM/vodafone/agent_productivity_interval_summary.csv postgres1:/tmp/agent_productivity_interval_summary.csv
+
+docker cp /home/devadmin/WFM/vodafone/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
+
+docker cp /home/devadmin/WFM/vodafone/vodafone_head_count.csv postgres1:/tmp/vodafone_head_count.csv
+
+docker cp /home/devadmin/WFM/vodafone/roster.csv postgres1:/tmp/roster.csv
+
+
+=============================================================================================================================================================
+
+## Step 2 — Load all 5 tables: (SQL)
+
+COPY pc_collated_dump FROM '/tmp/pc_collated_dump.csv' DELIMITER ',' CSV HEADER;
+
+COPY lead_master FROM '/tmp/lead_master.csv' DELIMITER ',' CSV HEADER;
+
+COPY custom_agent_productivity_interval_summary FROM '/tmp/custom_agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY call_history FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+
+COPY vodafone_head_count FROM '/tmp/vodafone_head_count.csv' DELIMITER ',' CSV HEADER;
+
+COPY roster FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
+
+=============================================================================================================================================================
+
+## UTF ERROR
+
+COPY agent_session_details
+FROM '/tmp/agent_session_details.csv'
+DELIMITER ',' CSV HEADER ENCODING 'WIN1252';
+
+=============================================================================================================================================================
+
+## To check the counts
+
+SELECT 'acd_call_details' AS table_name, COUNT(*) FROM acd_call_details
+UNION ALL
+SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+UNION ALL
+SELECT 'call_history', COUNT(*) FROM call_history
+UNION ALL
+SELECT 'calling_kpis_data', COUNT(*) FROM calling_kpis_data
+UNION ALL
+SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
+UNION ALL
+SELECT 'master_tarcker', COUNT(*) FROM master_tracker;
+
+=============================================================================================================================================================
