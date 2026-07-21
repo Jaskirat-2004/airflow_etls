@@ -6,7 +6,13 @@ docker cp /home/devadmin/WFM/vodafone/pc_collated_dump.csv postgres1:/tmp/pc_col
 
 docker cp /home/devadmin/WFM/vodafone/lead_master.csv postgres1:/tmp/lead_master.csv
 
-docker cp /home/devadmin/WFM/vodafone/call_history.csv postgres1:/tmp/call_history.csv
+docker cp /home/devadmin/WFM/vodafone/acd_call_details.csv postgres1:/tmp/acd_call_details.csv
+
+docker cp /home/devadmin/WFM/vodafone/acd_call_interval_summary.csv postgres1:/tmp/acd_call_interval_summary.csv
+
+docker cp /home/devadmin/WFM/vodafone/custom_pool_report.csv postgres1:/tmp/custom_pool_report.csv
+
+docker cp /home/devadmin/WFM/vodafone/custom_tagging.csv postgres1:/tmp/custom_tagging.csv
 
 docker cp /home/devadmin/WFM/vodafone/custom_agent_productivity_interval_summary.csv postgres1:/tmp/custom_agent_productivity_interval_summary.csv
 
@@ -31,7 +37,13 @@ COPY custom_agent_productivity_interval_summary FROM '/tmp/custom_agent_producti
 
 COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
 
-COPY call_history FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
+COPY acd_call_details FROM '/tmp/acd_call_details.csv' DELIMITER ',' CSV HEADER;
+
+COPY acd_call_interval_summary FROM '/tmp/acd_call_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY custom_pool_report FROM '/tmp/custom_pool_report.csv' DELIMITER ',' CSV HEADER;
+
+COPY custom_tagging FROM '/tmp/custom_tagging.csv' DELIMITER ',' CSV HEADER;
 
 COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
 
