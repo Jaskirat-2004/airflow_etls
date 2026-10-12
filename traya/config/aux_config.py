@@ -68,71 +68,54 @@ WITH ses AS (
     WHERE lower(user_id) LIKE '%maxicus%'
     AND report_date > '{last_processed}' AND report_date <= '{high_water_mark}'
     GROUP BY 1,2,3
-    ),
-
-mt AS (
-    SELECT DISTINCT ON (report_date, lower(trim(official_email)))
-        report_date                        AS report_date,
-        lower(trim(official_email)) AS agent_email,
-        emp_id                      AS mt_emp_id, 
-        emp_name                    AS mt_emp_name, 
-        designation                 AS mt_designation,
-        team_leader                 AS mt_team_leader, 
-        operations_manager          AS mt_operations_manager,
-        group_name                  AS mt_group_name, 
-        sub_group                   AS mt_sub_group, 
-        line_of_business            AS mt_line_of_business,
-        tenure                      AS mt_tenure,
-        date_of_joining             AS mt_doj, 
-        batch_number                AS mt_batch,
-        versant_score               AS mt_versant, 
-        active_status               AS mt_active_status, 
-        gender                      AS mt_gender,
-        education_level             AS mt_education, 
-        fresher_experience          AS mt_fresher_exp,
-
-        CASE
-            WHEN group_name='Training' THEN 'Training' 
-            WHEN group_name='OJT' THEN 'OJT' 
-            ELSE 'Live' 
-        END                         AS mt_status
-
-    FROM master_tracker
-    WHERE official_email IS NOT NULL AND official_email <> ''
-    ORDER BY report_date, lower(trim(official_email)), emp_id
-)
+    )
 
 SELECT
-    s.report_date, 
-    s.agent_email, 
+    s.report_date,
+    s.agent_email,
     'traya' as tenant_name,
     'maxicus' as entity_name,
 
     s.break_reason,
-    mt.mt_emp_id, 
-    mt.mt_emp_name, 
-    mt.mt_designation, 
-    mt.mt_status, 
-    mt.mt_team_leader, 
-    mt.mt_operations_manager,
-    mt.mt_group_name, 
-    mt.mt_sub_group, 
-    mt.mt_line_of_business, 
-    mt.mt_tenure, 
-    mt.mt_doj, 
-    mt.mt_batch,
-    mt.mt_versant, 
-    mt.mt_active_status, 
-    mt.mt_gender, 
-    mt.mt_education, 
-    mt.mt_fresher_exp,
-    s.segments, 
-    s.sessions, 
-    s.break_secs, 
+    xw.emp_id                          AS mt_emp_id,
+    mt.emp_name                        AS mt_emp_name,
+    mt.designation                     AS mt_designation,
+
+    CASE
+        WHEN mt.emp_id IS NULL        THEN NULL
+        WHEN mt.group_name='Training' THEN 'Training'
+        WHEN mt.group_name='OJT'      THEN 'OJT'
+        ELSE 'Live'
+    END                                AS mt_status,
+
+    mt.team_leader                     AS mt_team_leader,
+    mt.operations_manager              AS mt_operations_manager,
+    mt.group_name                      AS mt_group_name,
+    mt.sub_group                       AS mt_sub_group,
+    mt.line_of_business                AS mt_line_of_business,
+    mt.tenure                          AS mt_tenure,
+    mt.date_of_joining                 AS mt_doj,
+    mt.batch_number                    AS mt_batch,
+    mt.versant_score                   AS mt_versant,
+    mt.active_status                   AS mt_active_status,
+    mt.gender                          AS mt_gender,
+    mt.education_level                 AS mt_education,
+    mt.fresher_experience              AS mt_fresher_exp,
+    s.segments,
+    s.sessions,
+    s.break_secs,
     s.ready_secs
 
 FROM ses s
-    LEFT JOIN mt 
-    ON mt.report_date = s.report_date AND mt.agent_email = s.agent_email;
+
+    LEFT JOIN agent_identity_map xw
+           ON xw.client_id = s.agent_email
+          AND s.report_date BETWEEN xw.valid_from AND xw.valid_to
+
+    LEFT JOIN master_tracker mt
+           ON mt.emp_id      = xw.emp_id
+          AND mt.report_date = s.report_date;
 
 """
+
+

@@ -167,6 +167,6 @@ SELECT
     (h.employee_id IS NOT NULL)::int                                   AS hc_flag
 
 FROM alloc a
-LEFT JOIN vodafone_head_count h ON h.report_date = a.report_date AND h.employee_id = a.emp_id
+LEFT JOIN head_count h ON h.report_date = a.report_date AND h.employee_id = a.emp_id
 
 """

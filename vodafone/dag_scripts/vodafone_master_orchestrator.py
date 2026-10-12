@@ -1,5 +1,5 @@
 """
-PROGRAMMER : JASKIRAT 
+PROGRAMMER : JASKIRAT
 INFO : VODAFONE MASTER ORCHESTRATOR
 """
 # JS ================================== IMPORTS ================================== JS
@@ -26,6 +26,14 @@ default_args = {
 
 def master_orchestrator():
 
+    trigger_upsert = TriggerDagRunOperator(
+        task_id="trigger_upsert",
+        trigger_dag_id="vodafone_upsert_etl",
+        wait_for_completion=True,
+        poke_interval=30,
+        failed_states=["failed"],
+    )
+
     trigger_etl = TriggerDagRunOperator(
         task_id="trigger_etl",
         trigger_dag_id="vodafone_fact_table_etl",
@@ -34,24 +42,15 @@ def master_orchestrator():
         failed_states=["failed"],
     )
 
-    trigger_roster_upsert = TriggerDagRunOperator(
-        task_id="trigger_roster_upsert",
-        trigger_dag_id="vodafone_roster_upsert",
-        wait_for_completion=True,
-        poke_interval=30,
-        failed_states=["failed"],
-    )
-    
-    trigger_attendence = TriggerDagRunOperator(
-        task_id="trigger_attendence",
-        trigger_dag_id="vodafone_fact_attendence_etl",
+    trigger_attendance = TriggerDagRunOperator(
+        task_id="trigger_attendance",
+        trigger_dag_id="vodafone_fact_attendance_etl",
         wait_for_completion=True,
         poke_interval=30,
         failed_states=["failed"],
     )
 
     # ==================== STARTING TASKS ====================
-    trigger_etl
-    trigger_roster_upsert >> trigger_attendence
+    trigger_upsert >> trigger_etl >> trigger_attendance
 
 master_orchestrator()

@@ -1,4 +1,4 @@
-WITH
+﻿WITH
 emp_map AS (
     SELECT
         lower(split_part(email_id, '@', 1))  AS login_key,
@@ -127,7 +127,7 @@ base AS (
         COALESCE(dt.exception_secs, 0)                            AS exception_secs,
         (COALESCE(ap.raw_ready, 0) + COALESCE(dt.exception_secs, 0)) AS adjusted_ready_secs
 
-    FROM euler_head_count h
+    FROM head_count h
 
     LEFT JOIN ros r  
         ON  r.report_date  = h.report_date  
@@ -269,7 +269,7 @@ FROM base
 -- =========================================================================================
 
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_attendance_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_attendance_report
 (
     report_date            Date,
     week                   String,

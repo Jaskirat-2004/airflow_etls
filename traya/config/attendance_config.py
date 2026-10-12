@@ -70,23 +70,43 @@ TRAYA_FACT_ATTENDANCE_REPORT_QUERY = """
 
 WITH
 -- roster
+ros_raw AS (
+    SELECT report_date, emp_id, roster,
+           CASE WHEN substring(shift from '^([0-9]{{1,2}}:[0-9]{{2}})') IS NOT NULL
+                 AND substring(shift from '([0-9]{{1,2}}:[0-9]{{2}})$') IS NOT NULL
+                THEN shift END AS good_shift
+    FROM roster
+    WHERE report_date > '{last_processed}'
+),
+ros_grp AS (
+    SELECT *,
+           count(good_shift) OVER (PARTITION BY emp_id ORDER BY report_date)       AS g_back,
+           count(good_shift) OVER (PARTITION BY emp_id ORDER BY report_date DESC)  AS g_fwd
+    FROM ros_raw
+),
+ros_fill AS (
+    SELECT report_date, emp_id, roster, good_shift,
+           COALESCE(good_shift,
+                    first_value(good_shift) OVER (PARTITION BY emp_id, g_back ORDER BY report_date),
+                    first_value(good_shift) OVER (PARTITION BY emp_id, g_fwd  ORDER BY report_date DESC)
+           ) AS shift_eff
+    FROM ros_grp
+),
 ros AS (
     SELECT
         report_date,
         emp_id,
-        roster AS shift_raw,
-
-        substring(roster from '^([0-9]{{2}}:[0-9]{{2}})') AS shift_start,
-        substring(roster from '([0-9]{{2}}:[0-9]{{2}})$') AS shift_end,
-
-        substring(roster from '^([0-9]{{2}}:[0-9]{{2}})')::time AS ss,
-        substring(roster from '([0-9]{{2}}:[0-9]{{2}})$')::time AS se,
-
-        CASE WHEN roster ~ '[0-9]{{2}}:[0-9]{{2}}' THEN 'SHIFT' ELSE roster END AS status
-
-    FROM roster
-    WHERE report_date > '{last_processed}'
+        shift_eff AS shift_raw,
+        substring(shift_eff from '^([0-9]{{1,2}}:[0-9]{{2}})')        AS shift_start,
+        substring(shift_eff from '([0-9]{{1,2}}:[0-9]{{2}})$')        AS shift_end,
+        substring(shift_eff from '^([0-9]{{1,2}}:[0-9]{{2}})')::time  AS ss,
+        substring(shift_eff from '([0-9]{{1,2}}:[0-9]{{2}})$')::time  AS se,
+        CASE WHEN roster ~ '[0-9]{{1,2}}:[0-9]{{2}}' THEN 'SHIFT'
+             ELSE upper(trim(roster)) END                             AS status,
+        (good_shift IS NULL)::int                                     AS shift_inferred
+    FROM ros_fill
 ),
+
 
 -- agent_productivity_interval_summary
 ap_iv AS (
@@ -182,7 +202,9 @@ base AS (
         r.ss,
         r.se,
 
-        CASE WHEN r.se IS NOT NULL THEN EXTRACT(EPOCH FROM (r.se - r.ss))::int ELSE 0 END       AS scheduled_secs,
+        CASE WHEN r.se IS NOT NULL AND r.status IN ('SHIFT','HD')
+             THEN EXTRACT(EPOCH FROM (r.se - r.ss))::int ELSE 0 
+             END                                                                                AS scheduled_secs,
         s.first_login, s.last_logout, (s.last_logout IS NOT NULL)::int                          AS has_session,
         COALESCE(ap.raw_ready,0)                                                                AS raw_ready_secs,
         COALESCE(ap.break_secs,0)                                                               AS break_secs,

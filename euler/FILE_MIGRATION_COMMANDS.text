@@ -6,15 +6,14 @@ docker cp /home/devadmin/WFM/euler/agent_productivity_interval_summary.csv postg
 
 docker cp /home/devadmin/WFM/euler/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
 
-docker cp /home/devadmin/WFM/euler/agent_session_details.csv postgres1:/tmp/agent_session_details.csv
-
 docker cp /home/devadmin/WFM/euler/call_history.csv postgres1:/tmp/call_history.csv
 
 docker cp /home/devadmin/WFM/euler/leads_manual.csv postgres1:/tmp/leads_manual.csv
 
 docker cp /home/devadmin/WFM/euler/sql_manual.csv postgres1:/tmp/sql_manual.csv
 
-docker cp /home/devadmin/WFM/euler/euler_head_count.csv postgres1:/tmp/euler_head_count.csv
+## the table is head_count now, but the DUMP FILE on the server is still euler_head_count.csv
+docker cp /home/devadmin/WFM/euler/euler_head_count.csv postgres1:/tmp/head_count.csv
 
 docker cp /home/devadmin/WFM/euler/roster.csv postgres1:/tmp/roster.csv
 
@@ -23,35 +22,39 @@ docker cp /home/devadmin/WFM/euler/agent_mapper.csv postgres1:/tmp/agent_mapper.
 
 =============================================================================================================================================================
 
-## Step 2 — Load all 5 tables: (SQL)
+## Step 2 — Load into the STAGING tables: (SQL)
+## every load goes to <table>_staging; euler_upsert_etl merges into the main table.
 
-COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+COPY agent_productivity_interval_summary_staging FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
 
-COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+COPY agent_session_details_staging FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
 
-COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+COPY call_history_staging FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
 
-COPY call_history FROM '/tmp/call_history.csv' DELIMITER ',' CSV HEADER;
+COPY leads_manual_staging (report_date, lead_id, lead_name, phone) FROM '/tmp/leads_manual.csv' DELIMITER ',' CSV HEADER;
 
-COPY leads_manual FROM '/tmp/leads_manual.csv' DELIMITER ',' CSV HEADER;
+COPY sql_manual_staging FROM '/tmp/sql_manual.csv' DELIMITER ',' CSV HEADER;
 
-COPY sql_manual FROM '/tmp/sql_manual.csv' DELIMITER ',' CSV HEADER;
+COPY head_count_staging FROM '/tmp/head_count.csv' DELIMITER ',' CSV HEADER;
 
-COPY euler_head_count FROM '/tmp/euler_head_count.csv' DELIMITER ',' CSV HEADER;
+COPY roster_staging FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
 
-COPY roster FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
-
-COPY agent_mapper FROM '/tmp/agent_mapper.csv' DELIMITER ',' CSV HEADER;
+COPY agent_mapper_staging FROM '/tmp/agent_mapper.csv' DELIMITER ',' CSV HEADER;
 
 
 =============================================================================================================================================================
 
-## EXTRAS 
+## Step 3 — LOAD GATE. Run after every load, before the ETL. Every count must be 0.
 
-COPY leads_manual (report_date, lead_id, lead_name, phone) FROM '/tmp/leads_manual.csv' DELIMITER ',' CSV HEADER;
+SELECT count(*) FROM agent_session_details_staging WHERE login_time::date NOT IN (report_date, report_date-1, report_date+1);
 
-COPY calling_kpis_data (employee_id, coach_name, tl_name, process, location, num_attempted, num_answered, num_unanswered, total_time_spent, talk_time, calls_over_20m, miss_match_count) FROM '/tmp/calling_kpis_data.csv' DELIMITER ',' CSV HEADER;
-UPDATE calling_kpis_data SET report_date = '2026-05-28' WHERE report_date IS NULL;
+SELECT count(*) FROM agent_productivity_interval_summary_staging WHERE interval_start::date <> report_date;
+
+SELECT count(*) FROM call_history_staging WHERE call_time::date <> report_date;
+
+## a date flip on a 01/01, 02/02 ... 12/12 date is INVISIBLE to this gate.
+## if any date in a block fails, treat the whole block as suspect.
+
 
 =============================================================================================================================================================
 
@@ -69,12 +72,37 @@ SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_i
 UNION ALL
 SELECT 'downtime_login_hr', COUNT(*) FROM downtime_login_hr
 UNION ALL
-SELECT 'euler_head_count', COUNT(*) FROM euler_head_count
+SELECT 'head_count', COUNT(*) FROM head_count
 UNION ALL
 SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
 UNION ALL
 SELECT 'sql_manual', COUNT(*) FROM sql_manual
 UNION ALL
 SELECT 'agent_mapper', COUNT(*) FROM agent_mapper;
+
+## staging must be EMPTY after the upsert DAG runs
+
+SELECT 'roster_staging', COUNT(*) FROM roster_staging
+UNION ALL
+SELECT 'call_history_staging', COUNT(*) FROM call_history_staging
+UNION ALL
+SELECT 'leads_manual_staging', COUNT(*) FROM leads_manual_staging
+UNION ALL
+SELECT 'agent_productivity_interval_summary_staging', COUNT(*) FROM agent_productivity_interval_summary_staging
+UNION ALL
+SELECT 'downtime_login_hr_staging', COUNT(*) FROM downtime_login_hr_staging
+UNION ALL
+SELECT 'head_count_staging', COUNT(*) FROM head_count_staging
+UNION ALL
+SELECT 'agent_session_details_staging', COUNT(*) FROM agent_session_details_staging
+UNION ALL
+SELECT 'sql_manual_staging', COUNT(*) FROM sql_manual_staging
+UNION ALL
+SELECT 'agent_mapper_staging', COUNT(*) FROM agent_mapper_staging;
+
+=============================================================================================================================================================
+
+## NOTE — downtime_login_hr has no COPY line here but holds data.
+## its load path is undocumented; find it before putting it on staging.
 
 =============================================================================================================================================================

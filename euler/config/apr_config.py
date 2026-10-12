@@ -1,14 +1,15 @@
-
+﻿
 # JS =============================================================================================================== JS
 #                                       QUERIES FOR APR REPORT FACT TABLE
 # JS =============================================================================================================== JS
+# LAST_DATE : 2026-09-09
 
 
 # JS ======================================= DDL ======================================= JS
 
 EULER_FACT_APR_REPORT_DDL = """
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_apr_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_apr_report
 (
     report_date                 Date,
     agent_email                 String,
@@ -53,7 +54,7 @@ CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_apr_report
     ap_tht                      Nullable(Int64),
     ap_capped_ready_secs        Float64,
 
-    -- call_history pivots (COALESCEd → non-Nullable)
+    -- call_history pivots (COALESCEd â†’ non-Nullable)
     ch_calls                    Int32,
     ch_inbound_calls            Int32,
     ch_outbound_calls           Int32,
@@ -91,7 +92,7 @@ ORDER BY (report_date, campaign_name, agent_email)
 
 EULER_FACT_APR_REPORT_QUERY = """
 
--- agent_productivity_interval_summary  (1 row already per date×campaign×agent)
+-- agent_productivity_interval_summary  (1 row already per dateÃ—campaignÃ—agent)
 WITH ap AS (
     SELECT
         report_date                                                                                            AS report_date,
@@ -177,7 +178,7 @@ ch AS (
         COUNT(*) FILTER (WHERE system_disposition='CONNECTED')                      AS ch_connected,
         COUNT(*) FILTER (WHERE system_disposition<>'CONNECTED')                     AS ch_not_connected,
 
-        -- flag-then-sum unique (per date×campaign×agent×phone) — additive at this grain only
+        -- flag-then-sum unique (per dateÃ—campaignÃ—agentÃ—phone) â€” additive at this grain only
         COUNT(*) FILTER (WHERE rn_u=1)                                              AS ch_unique_dialled,
         COUNT(*) FILTER (WHERE rn_uc=1 AND system_disposition='CONNECTED')          AS ch_unique_connected,
 
@@ -202,7 +203,7 @@ ch AS (
     GROUP BY 1,2,3
 ),
 
--- SQL feed (client; date×agent — NO campaign per spec). Empty until loaded → all sql_allocated = 0.
+-- SQL feed (client; dateÃ—agent â€” NO campaign per spec). Empty until loaded â†’ all sql_allocated = 0.
 sq AS (
     SELECT 
         report_date, 
@@ -213,7 +214,7 @@ sq AS (
     WHERE user_id IS NOT NULL AND trim(user_id) <> ''
     GROUP BY 1,2),
 
--- backbone keys = productivity ∪ call activity
+-- backbone keys = productivity âˆª call activity
 keys AS (
     SELECT report_date, agent_email, campaign_name FROM ap
     UNION
@@ -298,7 +299,7 @@ SELECT
     COALESCE(ch.ch_hold_secs,0) ch_hold_secs,
     COALESCE(ch.ch_ivr_secs,0) ch_ivr_secs,
 
-    -- login share = capped ready / 8h   (1.0 = one full agent shift; sums to ≤1 per agent-day)
+    -- login share = capped ready / 8h   (1.0 = one full agent shift; sums to â‰¤1 per agent-day)
     COALESCE(
         LEAST(SUM(COALESCE(ap.ap_ready_secs,0)) OVER (PARTITION BY k.report_date, k.agent_email), 28800)
         * COALESCE(ap.ap_ready_secs,0)::numeric

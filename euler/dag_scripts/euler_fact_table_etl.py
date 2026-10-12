@@ -1,6 +1,7 @@
 """
 PROGRAMMER : JASKIRAT 
 INFO : EULERMOTORS FACT TABLE ETL 
+LAST_DATE : 2026-09-09
 """
 # JS ================================== IMPORTS ================================== JS
 
@@ -29,11 +30,11 @@ from euler.util.euler_util import (
 
 # POSTGRES
 SOURCE_CONN_ID = "DI-POSTGRES"
-SOURCE_DATABASE = "eulermotors"
+SOURCE_DATABASE = "eulermotors_maxicus"
 
 # CLICKHOUSE
 DESTINATION_CONN_ID = "DI-CLICKHOUSE"
-DESTINATION_DATABASE = "eulermotors"
+DESTINATION_DATABASE = "eulermotors_maxicus"
 
 # JS ================================== DAG ================================== JS
 

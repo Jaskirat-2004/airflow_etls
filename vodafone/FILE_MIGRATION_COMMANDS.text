@@ -1,5 +1,28 @@
 =============================================================================================================================================================
 
+## ⚠️ READ THIS FIRST — CHANGED 2026-08-27 (staging + upsert rollout)
+
+Every COPY below now loads into a **_staging** table, NOT the live table.
+Nothing is live until `vodafone_upsert_etl` merges staging -> destination and truncates staging.
+
+WHY: before this change, COPY wrote straight into the live tables, which had no primary key.
+Loading the same day twice silently doubled it. That is exactly what happened to the head count
+on 2026-08-01 and 2026-08-12, and it fanned out through the APR / FTE / attendance facts —
+FTE ended up holding two complete copies of itself.
+
+So: **do not "fix" a COPY by pointing it back at the live table.** If a load looks wrong, the
+destination now has a PK and will reject a genuine duplicate loudly instead of doubling.
+
+RENAMED 2026-08-27: `vodafone_head_count` -> `head_count` (matches the youbroadband naming).
+The CSV file on the server is still named `vodafone_head_count.csv`.
+
+TWO TABLES ARE DELIBERATELY NOT ON STAGING — they load straight into the live table, because
+no valid primary key exists for either (details in `config/upsert_config.py`):
+  * custom_pool_report  — one row per call LEG; only the export's "#" counter makes it unique
+  * custom_tagging      — no key at any width; even the full row is non-unique
+
+=============================================================================================================================================================
+
 ## Step 1 — Copy all CSVs into the container: (BASH)
 
 docker cp /home/devadmin/WFM/vodafone/pc_collated_dump.csv postgres1:/tmp/pc_collated_dump.csv
@@ -27,52 +50,103 @@ docker cp /home/devadmin/WFM/vodafone/roster.csv postgres1:/tmp/roster.csv
 
 =============================================================================================================================================================
 
-## Step 2 — Load all 5 tables: (SQL)
+## Step 2 — Load into STAGING: (SQL)
 
-COPY pc_collated_dump FROM '/tmp/pc_collated_dump.csv' DELIMITER ',' CSV HEADER;
+COPY pc_collated_dump_staging FROM '/tmp/pc_collated_dump.csv' DELIMITER ',' CSV HEADER;
 
-COPY lead_master FROM '/tmp/lead_master.csv' DELIMITER ',' CSV HEADER;
+COPY lead_master_staging FROM '/tmp/lead_master.csv' DELIMITER ',' CSV HEADER;
 
-COPY custom_agent_productivity_interval_summary FROM '/tmp/custom_agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+COPY custom_agent_productivity_interval_summary_staging FROM '/tmp/custom_agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
 
-COPY agent_productivity_interval_summary FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
+COPY agent_productivity_interval_summary_staging FROM '/tmp/agent_productivity_interval_summary.csv' DELIMITER ',' CSV HEADER;
 
-COPY acd_call_details FROM '/tmp/acd_call_details.csv' DELIMITER ',' CSV HEADER;
+COPY acd_call_details_staging FROM '/tmp/acd_call_details.csv' DELIMITER ',' CSV HEADER;
 
-COPY acd_call_interval_summary FROM '/tmp/acd_call_interval_summary.csv' DELIMITER ',' CSV HEADER;
+COPY acd_call_interval_summary_staging FROM '/tmp/acd_call_interval_summary.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_session_details_staging FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+
+COPY head_count_staging FROM '/tmp/vodafone_head_count.csv' DELIMITER ',' CSV HEADER;
+
+COPY roster_staging FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
+
+-- No staging (no valid PK) — these two still load directly into the live table:
 
 COPY custom_pool_report FROM '/tmp/custom_pool_report.csv' DELIMITER ',' CSV HEADER;
 
 COPY custom_tagging FROM '/tmp/custom_tagging.csv' DELIMITER ',' CSV HEADER;
 
-COPY agent_session_details FROM '/tmp/agent_session_details.csv' DELIMITER ',' CSV HEADER;
+-- Not currently fed by a dump. When they are, load them into STAGING too:
+-- COPY downtime_login_hr_staging FROM '/tmp/downtime_login_hr.csv' DELIMITER ',' CSV HEADER;
+-- COPY city_mapper_staging      FROM '/tmp/city_mapper.csv'      DELIMITER ',' CSV HEADER;
+--   (city_mapper is normally seeded by the INSERT block in create_table_commands/city_mapper.sql)
 
-COPY vodafone_head_count FROM '/tmp/vodafone_head_count.csv' DELIMITER ',' CSV HEADER;
+=============================================================================================================================================================
 
-COPY roster FROM '/tmp/roster.csv' DELIMITER ',' CSV HEADER;
+## Step 3 — Merge staging into the live tables
+
+Trigger the Airflow DAG:   vodafone_upsert_etl
+
+It upserts each *_staging into its destination on the destination's primary key, then TRUNCATEs
+the staging table. Re-running it after an identical load is a no-op on row counts — it only
+bumps `updated_at`. Running the master orchestrator does this for you first, then the facts:
+
+    vodafone_master_orchestrator
+        trigger_upsert  -> vodafone_upsert_etl
+        trigger_etl     -> vodafone_fact_table_etl
+        trigger_attendance -> vodafone_fact_attendance_etl
 
 =============================================================================================================================================================
 
 ## UTF ERROR
 
-COPY agent_session_details
+COPY agent_session_details_staging
 FROM '/tmp/agent_session_details.csv'
 DELIMITER ',' CSV HEADER ENCODING 'WIN1252';
+
+=============================================================================================================================================================
+
+## ⚠️ lead_master — the blank padding rows
+
+`lead_master.csv` carries ~652,868 rows where every field is empty. They are padding from the
+source export hitting Excel's 2^20 row cap (1,048,575 total, ~395,707 real leads).
+
+`lead_master.report_date` is NOT NULL on the destination, so those rows cannot be merged.
+`vodafone_upsert_etl` strips them from staging automatically (`prune_null_date` in
+`config/upsert_config.py`). Better still, export the CSV without them.
 
 =============================================================================================================================================================
 
 ## To check the counts
 
 SELECT 'acd_call_details' AS table_name, COUNT(*) FROM acd_call_details
-UNION ALL
-SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
-UNION ALL
-SELECT 'call_history', COUNT(*) FROM call_history
-UNION ALL
-SELECT 'calling_kpis_data', COUNT(*) FROM calling_kpis_data
-UNION ALL
-SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
-UNION ALL
-SELECT 'master_tarcker', COUNT(*) FROM master_tracker;
+UNION ALL SELECT 'acd_call_interval_summary', COUNT(*) FROM acd_call_interval_summary
+UNION ALL SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+UNION ALL SELECT 'agent_productivity_interval_summary', COUNT(*) FROM agent_productivity_interval_summary
+UNION ALL SELECT 'custom_agent_productivity_interval_summary', COUNT(*) FROM custom_agent_productivity_interval_summary
+UNION ALL SELECT 'custom_pool_report', COUNT(*) FROM custom_pool_report
+UNION ALL SELECT 'custom_tagging', COUNT(*) FROM custom_tagging
+UNION ALL SELECT 'pc_collated_dump', COUNT(*) FROM pc_collated_dump
+UNION ALL SELECT 'lead_master', COUNT(*) FROM lead_master
+UNION ALL SELECT 'head_count', COUNT(*) FROM head_count
+UNION ALL SELECT 'roster', COUNT(*) FROM roster
+UNION ALL SELECT 'downtime_login_hr', COUNT(*) FROM downtime_login_hr
+UNION ALL SELECT 'city_mapper', COUNT(*) FROM city_mapper
+ORDER BY 1;
+
+## Every staging table should be EMPTY after a successful upsert run
+
+SELECT 'acd_call_details_staging' AS staging_table, COUNT(*) AS rows_left FROM acd_call_details_staging
+UNION ALL SELECT 'acd_call_interval_summary_staging' AS staging_table, COUNT(*) AS rows_left FROM acd_call_interval_summary_staging
+UNION ALL SELECT 'agent_productivity_interval_summary_staging' AS staging_table, COUNT(*) AS rows_left FROM agent_productivity_interval_summary_staging
+UNION ALL SELECT 'agent_session_details_staging' AS staging_table, COUNT(*) AS rows_left FROM agent_session_details_staging
+UNION ALL SELECT 'city_mapper_staging' AS staging_table, COUNT(*) AS rows_left FROM city_mapper_staging
+UNION ALL SELECT 'custom_agent_productivity_interval_summary_staging' AS staging_table, COUNT(*) AS rows_left FROM custom_agent_productivity_interval_summary_staging
+UNION ALL SELECT 'downtime_login_hr_staging' AS staging_table, COUNT(*) AS rows_left FROM downtime_login_hr_staging
+UNION ALL SELECT 'head_count_staging' AS staging_table, COUNT(*) AS rows_left FROM head_count_staging
+UNION ALL SELECT 'lead_master_staging' AS staging_table, COUNT(*) AS rows_left FROM lead_master_staging
+UNION ALL SELECT 'pc_collated_dump_staging' AS staging_table, COUNT(*) AS rows_left FROM pc_collated_dump_staging
+UNION ALL SELECT 'roster_staging' AS staging_table, COUNT(*) AS rows_left FROM roster_staging
+ORDER BY 1;
 
 =============================================================================================================================================================

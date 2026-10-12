@@ -29,11 +29,11 @@ from vodafone.util.vodafone_util import (
 
 # POSTGRES
 SOURCE_CONN_ID = "DI-POSTGRES"
-SOURCE_DATABASE = "vodafone"
+SOURCE_DATABASE = "vodafone_maxicus"
 
 # CLICKHOUSE
 DESTINATION_CONN_ID = "DI-CLICKHOUSE"
-DESTINATION_DATABASE = "vodafone"
+DESTINATION_DATABASE = "vodafone_maxicus"
 
 # JS ================================== DAG ================================== JS
 

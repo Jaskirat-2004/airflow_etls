@@ -79,11 +79,33 @@ ORDER BY (report_date, interval_start, agent_email);
 TRAYA_FACT_INBOUND_REPORT_QUERY = """
 
 -- ---------- ACD per agent x 30-min interval ----------
-WITH acd AS (
+
+WITH acd_scope AS (
     SELECT
-        call_time::date                                                                               AS report_date,
-        date_trunc('hour', call_time) + floor(extract(minute from call_time)/30)*interval '30 minute' AS interval_start,
-        COALESCE(NULLIF(lower(trim(user_id)),''), '(queue_abandoned)')                                AS agent_email,
+        *,                                    -- brings report_date and everything the FILTERs need
+        
+        date_trunc('hour', report_date + call_time::time)
+          + floor(extract(minute from call_time)/30) * interval '30 minute'   AS interval_start,
+          
+        COALESCE(NULLIF(lower(trim(user_id)),''), '(queue_abandoned)')        AS agent_email
+        
+    FROM acd_call_details
+    
+    WHERE user_id IS NOT NULL
+      OR ( user_id IS NULL
+              AND call_time::time > '19:00:00'
+              AND upper(answered_hungup) = 'HUNGUP'
+              AND queue_name IN ('male_customer_probeg','female_customer_probeg',
+                                 'MaleCustomerProbegHindiQueue','FemaleCustomerProbegHindiQueue',
+                                 'MaleCustomerProbegEnglishQueue','FemaleCustomerProbegEnglishQueue')
+          )
+),
+
+acd AS (
+    SELECT
+        report_date,
+        interval_start,
+        agent_email,
 
         count(*)                                                                                      AS acd_offered,
         count(*) FILTER (WHERE upper(answered_hungup)='ANSWERED')                                     AS acd_answered,
@@ -109,16 +131,18 @@ WITH acd AS (
                    + extract(epoch from acw_duration::interval)),0)::bigint                           AS acd_tht_secs,
         COALESCE(sum(extract(epoch from wait_time::interval)),0)::bigint                              AS acd_wait_secs
 
-    FROM acd_call_details
-    WHERE campaign_name = 'Inbound_Campaign'      -- consider: AND call_type='inbound.call.dial' (guard for full multi-campaign dumps)
-    GROUP BY 1,2,3
+    FROM acd_scope
+    GROUP BY report_date, interval_start, agent_email
 ),
 
 -- ---------- interval summary (inbound campaign) per agent x 30-min ----------
 ap AS (
     SELECT
         report_date,
-        interval_start,
+
+        date_trunc('hour', report_date + interval_start::time)
+          + floor(extract(minute from interval_start)/30) * interval '30 minute'                      AS interval_start,
+
         lower(trim(user_id))                                                                          AS agent_email,
 
         COALESCE(sum(extract(epoch from total_staffed_duration::interval)),0)::bigint                 AS ap_staffed_secs,
@@ -135,52 +159,11 @@ ap AS (
 
         -- LOGIN COUNT
         COALESCE(sum(extract(epoch from total_ready_duration::interval)),0)/28800.0   AS ap_login_count
-
+    
     FROM agent_productivity_interval_summary
-    WHERE campaign_name = 'Inbound_Campaign'
-    GROUP BY 1,2,3
-),
-
--- ---------- roster dims (APR-style), one row per (date, agent) ----------
-mt AS (
-    SELECT DISTINCT ON (report_date, lower(trim(official_email)))
-        report_date,
-        lower(trim(official_email))   AS agent_email,
-
-        emp_id                        AS mt_emp_id,
-        emp_name                      AS mt_emp_name,
-        designation                   AS mt_designation,
-        group_name                    AS mt_group_name,
-        sub_group                     AS mt_sub_group,  
-        line_of_business              AS mt_lob,
-        team_leader                   AS mt_team_leader,
-        operations_manager            AS mt_operations_manager,
-        tenure                        AS mt_tenure,
-
-        CASE
-            WHEN tenure ~ '^[0-9]+$' AND tenure::int <= 30              THEN '0-30'
-            WHEN tenure ~ '^[0-9]+$' AND tenure::int BETWEEN 31 AND 60  THEN '31-60'
-            WHEN tenure ~ '^[0-9]+$' AND tenure::int > 60               THEN '>60'
-            ELSE 'Unknown'
-        END                           AS mt_tenure_bucket,   -- computed on the tenure column
-
-        date_of_joining               AS mt_doj,
-        batch_number                  AS mt_batch,
-        versant_score                 AS mt_versant,
-        gender                        AS mt_gender,
-        education_level               AS mt_education,
-        fresher_experience            AS mt_fresher_exp,
-        active_status                 AS mt_active_status,
-        
-        CASE
-            WHEN group_name = 'Training' THEN 'Training'
-            WHEN group_name = 'OJT'      THEN 'OJT'
-            ELSE 'Live'
-        END                           AS mt_status
-
-    FROM master_tracker
-    WHERE official_email IS NOT NULL AND official_email <> '' AND active_status = 'Active'
-    ORDER BY report_date, lower(trim(official_email)), emp_id
+    WHERE campaign_name IN ('Inbound_Campaign', 'DeliveryTeam_Escalations_Campaign')
+    
+    GROUP BY report_date, interval_start, agent_email
 )
 
 -- ---------- final fact ----------
@@ -201,24 +184,38 @@ SELECT
     COALESCE(acd.interval_start, ap.interval_start)                                                  AS interval_start,
 
     -- master tracker
-    mt.mt_emp_id,
-    mt.mt_emp_name,
-    mt.mt_designation,
-    mt.mt_group_name,
-    mt.mt_sub_group,
-    mt.mt_lob,
-    mt.mt_team_leader,
-    mt.mt_operations_manager,
-    mt.mt_tenure,
-    mt.mt_tenure_bucket,
-    mt.mt_doj,
-    mt.mt_batch,
-    mt.mt_versant,
-    mt.mt_gender,
-    mt.mt_education,
-    mt.mt_fresher_exp,
-    mt.mt_active_status,
-    mt.mt_status,
+    
+    xw.emp_id                     AS mt_emp_id,
+    mt.emp_name                   AS mt_emp_name,
+    mt.designation                AS mt_designation,
+    mt.group_name                 AS mt_group_name,
+    mt.sub_group                  AS mt_sub_group,
+    mt.line_of_business           AS mt_lob,
+    mt.team_leader                AS mt_team_leader,
+    mt.operations_manager         AS mt_operations_manager,
+    mt.tenure                     AS mt_tenure,
+
+    CASE
+        WHEN mt.tenure ~ '^[0-9]+$' AND mt.tenure::int <= 30              THEN '0-30'
+        WHEN mt.tenure ~ '^[0-9]+$' AND mt.tenure::int BETWEEN 31 AND 60  THEN '31-60'
+        WHEN mt.tenure ~ '^[0-9]+$' AND mt.tenure::int > 60               THEN '>60'
+        ELSE 'Unknown'
+    END                           AS mt_tenure_bucket,
+
+    mt.date_of_joining            AS mt_doj,
+    mt.batch_number               AS mt_batch,
+    mt.versant_score              AS mt_versant,
+    mt.gender                     AS mt_gender,
+    mt.education_level            AS mt_education,
+    mt.fresher_experience         AS mt_fresher_exp,
+    mt.active_status              AS mt_active_status,
+
+    CASE
+        WHEN mt.emp_id IS NULL          THEN NULL
+        WHEN mt.group_name = 'Training' THEN 'Training'
+        WHEN mt.group_name = 'OJT'      THEN 'OJT'
+        ELSE 'Live'
+    END                           AS mt_status,
 
     -- ACD per-call measures
     COALESCE(acd.acd_offered,0)        AS acd_offered,
@@ -253,9 +250,15 @@ SELECT
 
 FROM acd
 FULL OUTER JOIN ap USING (report_date, interval_start, agent_email)
-LEFT JOIN mt
-    ON  mt.report_date = COALESCE(acd.report_date, ap.report_date)
-    AND mt.agent_email = COALESCE(acd.agent_email, ap.agent_email)
+
+LEFT JOIN agent_identity_map xw
+    ON  xw.client_id = COALESCE(acd.agent_email, ap.agent_email)
+    AND COALESCE(acd.report_date, ap.report_date) BETWEEN xw.valid_from AND xw.valid_to
+
+LEFT JOIN master_tracker mt
+    ON  mt.emp_id        = xw.emp_id
+    AND mt.report_date   = COALESCE(acd.report_date, ap.report_date)
+        AND mt.active_status = 'Active'
 
 WHERE COALESCE(acd.report_date, ap.report_date) > '{last_processed}'
     AND COALESCE(acd.report_date, ap.report_date) <= '{high_water_mark}'

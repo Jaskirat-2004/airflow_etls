@@ -1,13 +1,14 @@
-# JS =============================================================================================================== JS
+﻿# JS =============================================================================================================== JS
 #                              QUERIES FOR DISPOSITION REPORT FACT TABLE
 # JS =============================================================================================================== JS
+# LAST_DATE : 2026-09-09
 
 
 # JS ======================================= DDL ======================================= JS
 
 EULER_FACT_DISPOSITION_REPORT_DDL = """
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_disposition_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_disposition_report
 (
   report_date                   Date,
   week                          String,

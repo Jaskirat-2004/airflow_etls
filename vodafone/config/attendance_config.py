@@ -141,7 +141,7 @@ base AS (
         COALESCE(dt.exception_secs,0) AS exception_secs,
         (COALESCE(ap.raw_ready,0) + COALESCE(dt.exception_secs,0)) AS adjusted_ready_secs,
         ac.primary_campaign, ac.primary_process
-    FROM vodafone_head_count h
+    FROM head_count h
     LEFT JOIN ros r      ON r.report_date  = h.report_date AND r.emp_id  = h.employee_id
     LEFT JOIN ap         ON ap.report_date = h.report_date AND ap.emp_id = h.employee_id
     LEFT JOIN ap_camp ac ON ac.report_date = h.report_date AND ac.emp_id = h.employee_id

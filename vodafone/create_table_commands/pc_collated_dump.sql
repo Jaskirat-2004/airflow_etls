@@ -1,4 +1,5 @@
-CREATE TABLE pc_collated_dump (
+
+CREATE TABLE pc_collated_dump_staging (
     report_date                 DATE,
     prospect_id                 TEXT,
     email_address               TEXT,
@@ -26,4 +27,37 @@ CREATE TABLE pc_collated_dump (
     lead_owner_email            TEXT,
     lead_number                 TEXT,
     activity_added_by           TEXT
+);
+
+
+CREATE TABLE pc_collated_dump (
+    report_date                 DATE   NOT NULL,
+    prospect_id                 TEXT,
+    email_address               TEXT,
+    phone_number                TEXT,
+    lead_name                   TEXT,
+    activity_id                 TEXT   NOT NULL,
+    activity_event              INTEGER,
+    activity_event_name         TEXT,
+    activity_date               TIMESTAMP,
+    activity_modified_on        TIMESTAMP,
+    notes                       TEXT,
+    status                      TEXT,
+    owner_user_id               TEXT,
+    owner_user_name             TEXT,
+    owner_user_email            TEXT,
+    outcome                     TEXT,
+    interested_outcome          TEXT,
+    follow_up_date_and_time     TIMESTAMP,
+    not_interested_reason       TEXT,
+    pincode                     TEXT,
+    order_outcome               TEXT,
+    order_action_outcome        TEXT,
+    order_cancelled_reason      TEXT,
+    lead_created_on             TIMESTAMP,
+    lead_owner_email            TEXT,
+    lead_number                 TEXT,
+    activity_added_by           TEXT,
+    updated_at                     TIMESTAMP DEFAULT NOW(),   -- when this row was last merged (audit/debug)
+    PRIMARY KEY (report_date, activity_id)
 );

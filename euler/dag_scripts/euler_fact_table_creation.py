@@ -1,6 +1,7 @@
 """
 PROGRAMMER : JASKIRAT
 INFO : EULER - CREATE CLICKHOUSE FACT TABLES
+LAST_DATE : 2026-09-09
 """
 
 # JS ========================================= IMPORTS ========================================= JS
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 # JS ==================================== CONNECTOIN CONFIG ==================================== JS
 
 DESTINATION_CONN_ID = "DI-CLICKHOUSE"
-DESTINATION_DATABASE = "eulermotors"
+DESTINATION_DATABASE = "eulermotors_maxicus"
 
 # JS ==================================== DAG ==================================== JS
 

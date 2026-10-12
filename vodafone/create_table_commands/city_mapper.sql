@@ -1,7 +1,17 @@
-CREATE TABLE city_mapper (
+
+CREATE TABLE city_mapper_staging (
     old_circle_code     TEXT,
     new_circle_code     TEXT
 );
+
+
+CREATE TABLE city_mapper (
+    old_circle_code     TEXT   NOT NULL,
+    new_circle_code     TEXT,
+    updated_at                     TIMESTAMP DEFAULT NOW(),   -- when this row was last merged (audit/debug)
+    PRIMARY KEY (old_circle_code)
+);
+
 
 INSERT INTO city_mapper (old_circle_code, new_circle_code) VALUES
 ('MAG', 'MHG'),

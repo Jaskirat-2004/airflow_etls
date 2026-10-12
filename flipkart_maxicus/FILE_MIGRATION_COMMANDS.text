@@ -1,0 +1,77 @@
+=============================================================================================================================================================
+
+## Step 1 — Copy all CSVs into the container: (BASH)
+
+docker cp /home/devadmin/WFM/youbroadband/acd_call_details_staging.csv postgres1:/tmp/acd_call_details_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/acd_call_interval_summary_staging.csv postgres1:/tmp/acd_call_interval_summary_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/agent_productivity_interval_summary_staging.csv postgres1:/tmp/agent_productivity_interval_summary_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/agent_session_details_staging.csv postgres1:/tmp/agent_session_details_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/head_count_staging.csv postgres1:/tmp/head_count_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/call_details_staging.csv postgres1:/tmp/call_details_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/ivr_footprint_staging.csv postgres1:/tmp/ivr_footprint_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/roster_staging.csv postgres1:/tmp/roster_staging.csv
+
+docker cp /home/devadmin/WFM/youbroadband/forecast_staging.csv postgres1:/tmp/forecast_staging.csv
+
+
+=============================================================================================================================================================
+
+## Step 2 — Load all 5 tables: (SQL)
+
+COPY agent_productivity_interval_summary_staging FROM '/tmp/agent_productivity_interval_summary_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY acd_call_details_staging FROM '/tmp/acd_call_details_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY acd_call_interval_summary_staging FROM '/tmp/acd_call_interval_summary_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY agent_session_details_staging FROM '/tmp/agent_session_details_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY ivr_footprint_staging FROM '/tmp/ivr_footprint_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY call_details_staging FROM '/tmp/call_details_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY head_count_staging FROM '/tmp/head_count_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY roster_staging FROM '/tmp/roster_staging.csv' DELIMITER ',' CSV HEADER;
+
+COPY forecast_staging FROM '/tmp/forecast_staging.csv' DELIMITER ',' CSV HEADER;
+
+=============================================================================================================================================================
+
+## UTF ERROR
+
+COPY agent_session_details
+FROM '/tmp/agent_session_details.csv'
+DELIMITER ',' CSV HEADER ENCODING 'WIN1252';
+
+=============================================================================================================================================================
+
+## To check the counts
+
+SELECT 'agent_productivity_interval_summary' AS table_name, COUNT(*) FROM agent_productivity_interval_summary
+UNION ALL
+SELECT 'acd_call_details', COUNT(*) FROM acd_call_details
+UNION ALL
+SELECT 'acd_call_interval_summary', COUNT(*) FROM acd_call_interval_summary
+UNION ALL
+SELECT 'agent_session_details', COUNT(*) FROM agent_session_details
+UNION ALL
+SELECT 'ivr_footprint', COUNT(*) FROM ivr_footprint
+UNION ALL
+SELECT 'call_details', COUNT(*) FROM call_details
+UNION ALL
+SELECT 'head_count', COUNT(*) FROM head_count
+UNION ALL
+SELECT 'roster', COUNT(*) FROM roster
+UNION ALL
+SELECT 'forecast', COUNT(*) FROM forecast
+
+
+=============================================================================================================================================================

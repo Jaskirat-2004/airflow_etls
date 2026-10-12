@@ -1,3 +1,48 @@
+-- UNIQUE NULLS NOT DISTINCT, not a PRIMARY KEY: user_id / disposition_code /
+-- disposition_class are NULL on ~70% of rows (unattended dialer attempts).
+-- Requires Postgres 15+.
+
+CREATE TABLE call_history_staging (
+    report_date              DATE,
+    setup_id                 TEXT,
+    setup_name               TEXT,
+    call_id                  TEXT,
+    crt_object_id            TEXT,
+    call_time                TIMESTAMP,
+    process_name             TEXT,
+    campaign_name            TEXT,
+    queue_name               TEXT,
+    lead_id                  INTEGER,
+    lead_name                TEXT,
+    phone                    TEXT,
+    did                      TEXT,
+    other_filter_groups      TEXT,
+    applied_filter_group     TEXT,
+    table_filters            TEXT,
+    customer_id              BIGINT,
+    call_type                TEXT,
+    system_disposition       TEXT,
+    hangup_cause_code        INTEGER,
+    hangup_details           TEXT,
+    customer_setup_time      VARCHAR(8),
+    customer_ringing_time    VARCHAR(8),
+    ivr_time                 VARCHAR(8),
+    customer_talk_time       VARCHAR(8),
+    customer_hold_duration   VARCHAR(8),
+    actual_channel           TEXT,
+    attempt_number           INTEGER,
+    association_type         TEXT,
+    user_id                  TEXT,
+    user_name                TEXT,
+    disposition_code         TEXT,
+    disposition_class        TEXT,
+    transfer_to_agent_phone  TEXT,
+    user_setup_time          VARCHAR(8),
+    user_ringing_time        VARCHAR(8),
+    user_talk_time           VARCHAR(8),
+    acw_duration             VARCHAR(8),
+    call_notes               TEXT
+);
 
 CREATE TABLE call_history (
     report_date              DATE,
@@ -38,5 +83,8 @@ CREATE TABLE call_history (
     user_ringing_time        VARCHAR(8),
     user_talk_time           VARCHAR(8),
     acw_duration             VARCHAR(8),
-    call_notes               TEXT
+    call_notes               TEXT,
+    updated_at               TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT call_history_uk
+      UNIQUE NULLS NOT DISTINCT (report_date, call_id, user_id, disposition_code, disposition_class)
 );

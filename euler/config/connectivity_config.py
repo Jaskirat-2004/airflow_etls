@@ -1,13 +1,14 @@
-# JS =============================================================================================================== JS
+﻿# JS =============================================================================================================== JS
 #                              QUERIES FOR CONNECTIVITY REPORT FACT TABLE
 # JS =============================================================================================================== JS
+# LAST_DATE : 2026-09-09
 
 
 # JS ======================================= DDL ======================================= JS
 
 EULER_FACT_CONNECTIVITY_REPORT_DDL = """
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_connectivity_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_connectivity_report
 (
   report_date                   Date, 
   week                          String, 

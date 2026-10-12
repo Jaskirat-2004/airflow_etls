@@ -1,13 +1,14 @@
-# JS =============================================================================================================== JS
+﻿# JS =============================================================================================================== JS
 #                                       QUERIES FOR LEADS REPORT FACT TABLE
 # JS =============================================================================================================== JS
+# LAST_DATE : 2026-09-09
 
 
 # JS ======================================= DDL ======================================= JS
 
 EULER_FACT_LEADS_REPORT_DDL = """
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_leads_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_leads_report
 (
   report_date          Date,
   source               String,
@@ -35,7 +36,7 @@ ORDER BY (report_date, source, location)
 
 EULER_FACT_LEADS_REPORT_QUERY = """
 
--- call_history aggregated to (date, phone) — one row per dialed number per day
+-- call_history aggregated to (date, phone) â€” one row per dialed number per day
 WITH ch_agg AS (
   SELECT
     call_time::date AS report_date,

@@ -42,7 +42,7 @@ JS_FACT_CONFIG = {
         "destination_table" : "vodafone_fact_apr_report",
         "source_tables" : [
             {"table_name" : "custom_agent_productivity_interval_summary" , "date_column" : "report_date"},
-            {"table_name" : "vodafone_head_count" , "date_column" : "report_date"},
+            {"table_name" : "head_count" , "date_column" : "report_date"},
         ],
     },
 
@@ -52,7 +52,7 @@ JS_FACT_CONFIG = {
         "destination_table" : "vodafone_fact_fte_report",
         "source_tables" : [
             {"table_name" : "agent_productivity_interval_summary" , "date_column" : "report_date"},
-            {"table_name" : "vodafone_head_count" , "date_column" : "report_date"},
+            {"table_name" : "head_count" , "date_column" : "report_date"},
         ],
     },
 

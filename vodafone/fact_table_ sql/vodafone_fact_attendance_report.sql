@@ -118,7 +118,7 @@ base AS (
         ac.primary_campaign, 
         ac.primary_process
     
-    FROM vodafone_head_count h
+    FROM head_count h
     
     LEFT JOIN ros r      
         ON r.report_date  = h.report_date AND r.emp_id  = h.employee_id

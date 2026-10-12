@@ -96,13 +96,12 @@ SELECT
     COALESCE(m.education_level, 'UNKNOWN')    AS education_level,
     COALESCE(m.active_status, 'UNKNOWN')      AS active_status,
     COALESCE(m.tenure, 'UNKNOWN')             AS tenure,
-    m.date_of_joining                         AS date_of_joining       -- for tenure buckets
+    COALESCE(m.date_of_joining, 'UNKNOWN')    AS date_of_joining
 
 FROM calling_kpis_data as c
 LEFT JOIN master_tracker as m
     ON c.report_date = m.report_date 
     AND c.employee_id = m.emp_id
-
 WHERE c.report_date > '{last_processed}'
     AND c.report_date <= '{high_water_mark}'
 

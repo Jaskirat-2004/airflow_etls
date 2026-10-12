@@ -1,5 +1,6 @@
 """
 EULER UTILS FOR REPORTS
+LAST_DATE : 2026-09-09
 """
 
 import logging
@@ -108,6 +109,28 @@ def update_tracking_table(pg_cursor,table_name:str,high_water_mark:str,rows_inse
     pg_cursor.connection.commit()
 
     logger.info(f"JS ====== TRACKING TABLE UPDATED : last_processed_date : [{high_water_mark}] | rows_inserted : [{rows_inserted}] | FOR [{table_name}] ====== JS")
+
+# JS ============================== UPSERT QUERY ============================== JS
+
+def upsert_query(table_staging:str,destination_table:str,primary_key:list,columns:list):
+
+    primary_key_str = ", ".join(f'"{pk}"' for pk in primary_key)
+    columm_str      = ", ".join(f'"{c}"' for c in columns)
+    update_column_list = [f'"{col}" = EXCLUDED."{col}"' for col in columns if col not in primary_key]
+    update_column_list.append(f'"updated_at" = NOW()')
+    update_column_str = ",\n".join(update_column_list)
+
+    query = f"""
+    INSERT INTO {destination_table} ({columm_str})
+    SELECT DISTINCT ON ({primary_key_str}) {columm_str}
+    FROM {table_staging}
+    ORDER BY {primary_key_str}, ctid DESC
+    ON CONFLICT ({primary_key_str})
+    DO UPDATE SET
+        {update_column_str}
+    """
+
+    return query
 
 # JS ============================== NEW ============================== JS
 

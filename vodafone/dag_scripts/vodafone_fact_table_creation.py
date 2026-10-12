@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # JS ==================================== CONNECTOIN CONFIG ==================================== JS
 
 DESTINATION_CONN_ID = "DI-CLICKHOUSE"
-DESTINATION_DATABASE = "vodafone"
+DESTINATION_DATABASE = "vodafone_maxicus"
 
 # JS ==================================== DAG ==================================== JS
 

@@ -79,5 +79,5 @@ SELECT
     1                                                                  AS login_count
 
 FROM agg a
-LEFT JOIN vodafone_head_count h
+LEFT JOIN head_count h
     ON h.report_date = a.report_date AND h.employee_id = a.emp_id

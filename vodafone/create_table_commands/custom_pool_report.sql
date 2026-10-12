@@ -1,3 +1,8 @@
+-- custom_pool_report
+-- ============================================================================================
+-- NO PRIMARY KEY AVAILABLE  -- deliberately NOT on the staging + upsert pattern (2026-08-27)
+-- ============================================================================================
+
 CREATE TABLE custom_pool_report (
     report_date                 DATE,
     sr_no                       INTEGER,

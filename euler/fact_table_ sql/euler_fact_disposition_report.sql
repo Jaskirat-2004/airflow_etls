@@ -1,4 +1,4 @@
-
+﻿
 
 WITH ch AS (
   SELECT
@@ -51,7 +51,7 @@ GROUP BY report_date, campaign_name, location,
 DDL
 
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_disposition_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_disposition_report
 (
   report_date                   Date,
   week                          String,

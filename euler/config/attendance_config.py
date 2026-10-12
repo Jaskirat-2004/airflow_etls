@@ -1,6 +1,7 @@
-# JS =============================================================================================================== JS
+﻿# JS =============================================================================================================== JS
 #                                       QUERIES FOR ATTENDENCE REPORT FACT TABLE
 # JS =============================================================================================================== JS
+# LAST_DATE : 2026-09-09
 
 
 # JS ======================================= DDL ======================================= JS
@@ -8,7 +9,7 @@
 
 EULER_FACT_ATTENDANCE_REPORT_DDL = """
 
-CREATE TABLE IF NOT EXISTS eulermotors.euler_fact_attendance_report
+CREATE TABLE IF NOT EXISTS eulermotors_maxicus.euler_fact_attendance_report
 (
     report_date            Date,
     week                   String,
@@ -72,15 +73,6 @@ ORDER BY (report_date, emp_id)
 EULER_FACT_ATTENDANCE_REPORT_QUERY = """
 
 WITH
-emp_map AS (
-    SELECT
-        lower(split_part(email_id, '@', 1))  AS login_key,
-        emp_id
-    FROM agent_mapper
-    WHERE email_id IS NOT NULL
-      AND email_id <> ''
-),
-
 -- ===== ROSTER: shift 'HH:MM - HH:MM' OR status (WO/PL/HD/Leave/OFF ROSTER) =====
 ros AS (
     SELECT
@@ -109,8 +101,9 @@ ap_iv AS (
         EXTRACT(EPOCH FROM NULLIF(a.total_break_duration, '')::interval)::int AS bs
 
     FROM agent_productivity_interval_summary a
-    LEFT JOIN emp_map m
-        ON m.login_key = lower(split_part(a.user_id, '@', 1))
+    LEFT JOIN agent_identity_map m
+            ON m.client_id = lower(split_part(a.user_id, '@', 1))
+            AND a.report_date BETWEEN m.valid_from AND m.valid_to
 
     WHERE a.report_date > '{last_processed}'
 ),
@@ -145,8 +138,11 @@ ses AS (
         MIN(s.login_time)                                         AS first_login,
         MAX(s.logout_time)                                        AS last_logout
     FROM agent_session_details s
-    LEFT JOIN emp_map m
-        ON m.login_key = lower(split_part(s.user_id, '@', 1))
+    
+    LEFT JOIN agent_identity_map m
+            ON m.client_id = lower(split_part(s.user_id, '@', 1))
+            AND s.report_date BETWEEN m.valid_from AND m.valid_to
+
     WHERE s.report_date > '{last_processed}'
     GROUP BY 1, 2
 ),
@@ -200,7 +196,7 @@ base AS (
         COALESCE(dt.exception_secs, 0)                            AS exception_secs,
         (COALESCE(ap.raw_ready, 0) + COALESCE(dt.exception_secs, 0)) AS adjusted_ready_secs
 
-    FROM euler_head_count h
+    FROM head_count h
 
     LEFT JOIN ros r  
         ON  r.report_date  = h.report_date  

@@ -1,0 +1,66 @@
+=============================================================================================================================================================
+
+## Step 1 — Copy all CSVs into the container: (BASH)
+
+docker cp /home/devadmin/WFM/platinumrx/platinumrx_head_count.csv postgres1:/tmp/platinumrx_head_count.csv
+
+docker cp /home/devadmin/WFM/platinumrx/platinumrx_roster.csv postgres1:/tmp/platinumrx_roster.csv
+
+docker cp /home/devadmin/WFM/platinumrx/platinumrx_agent_login.csv postgres1:/tmp/platinumrx_agent_login.csv
+
+
+=============================================================================================================================================================
+
+## Step 2 — Load all 3 tables: (SQL)
+
+COPY platinumrx_agent_login (report_date, emp_id, first_login, last_logout)
+FROM '/tmp/platinumrx_agent_login.csv' DELIMITER ',' CSV HEADER;
+
+COPY platinumrx_roster (report_date, emp_id, roster)
+FROM '/tmp/platinumrx_roster.csv' DELIMITER ',' CSV HEADER;
+
+-- head_count is created with the full HRMS column set. List only the columns the export
+-- actually has, otherwise COPY fails on a column-count mismatch.
+COPY platinumrx_head_count (
+    report_date, employee_id, employee_name, ou_name, location_name, designation_name,
+    grade, employee_type, department_name, reporting_to_name, reporting_to_id,
+    functional_reporting_to_name, functional_reporting_to_id, date_of_joining,
+    gender, current_status, batch_number, workplace_category, company
+)
+FROM '/tmp/platinumrx_head_count.csv' DELIMITER ',' CSV HEADER;
+
+=============================================================================================================================================================
+
+## Daily roster refresh (staging -> upsert)
+
+-- the one-time load above goes straight into platinumrx_roster.
+-- every later roster dump lands in the staging table and the platinumrx_roster_upsert DAG merges it.
+
+TRUNCATE platinumrx_roster_staging;
+
+COPY platinumrx_roster_staging (report_date, emp_id, roster)
+FROM '/tmp/platinumrx_roster.csv' DELIMITER ',' CSV HEADER;
+
+=============================================================================================================================================================
+
+## UTF ERROR
+
+COPY platinumrx_head_count
+FROM '/tmp/platinumrx_head_count.csv'
+DELIMITER ',' CSV HEADER ENCODING 'WIN1252';
+
+=============================================================================================================================================================
+
+## To check the counts
+
+SELECT 'platinumrx_head_count' AS table_name, COUNT(*) FROM platinumrx_head_count
+UNION ALL
+SELECT 'platinumrx_roster', COUNT(*) FROM platinumrx_roster
+UNION ALL
+SELECT 'platinumrx_roster_staging', COUNT(*) FROM platinumrx_roster_staging
+UNION ALL
+SELECT 'platinumrx_agent_login', COUNT(*) FROM platinumrx_agent_login
+UNION ALL
+SELECT 'platinumrx_tracking_table', COUNT(*) FROM platinumrx_tracking_table;
+
+=============================================================================================================================================================
